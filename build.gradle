@@ -1,0 +1,93 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+    id 'io.github.gradle-nexus.publish-plugin' version '1.1.0'
+}
+
+
+def pyroscopeVersion = project.properties['pyroscope_version']
+group = "io.pyroscope"
+version = pyroscopeVersion
+
+nexusPublishing {
+    repositories {
+        sonatype {  //only for users registered in Sonatype after 24 Feb 2021
+            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+        }
+    }
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+repositories {
+    mavenCentral()
+    maven { url = "https://s01.oss.sonatype.org/content/repositories/snapshots/" } //todo do not commit
+}
+
+
+dependencies {
+    implementation("io.pyroscope:agent:$pyroscopeVersion")
+    implementation platform("io.opentelemetry:opentelemetry-bom:1.15.0")
+    implementation('io.opentelemetry:opentelemetry-api')
+    implementation('io.opentelemetry:opentelemetry-sdk')
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+jar {
+    
+}
+
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) { publication ->
+            from components.java
+            groupId = 'io.pyroscope'
+            artifactId = 'otel'
+            version = pyroscopeVersion
+            pom {
+                name = 'Pyroscope OTEL integration'
+                description = 'Pyroscope OTEL integration'
+                url = 'https://pyroscope.io'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pyroscope'
+                        name = 'Pyroscope'
+                        email = 'anatoly@pyroscope.io'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/pyroscope-io/pyroscope-java.git'
+                    developerConnection = 'scm:git:ssh://github.com/pyroscope-io/pyroscope-java.git'
+                    url = 'https://github.com/pyroscope-io/pyroscope-java'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            credentials {
+                username project.hasProperty('nexusUsername') ? project.nexusUsername : ''
+                password project.hasProperty('nexusPassword') ? project.nexusPassword : ''
+            }
+            url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}
