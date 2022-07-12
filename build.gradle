@@ -7,8 +7,9 @@ plugins {
 
 
 def pyroscopeVersion = project.properties['pyroscope_version']
+def otelProfilingVersion = project.properties['otel_profiling_version']
 group = "io.pyroscope"
-version = pyroscopeVersion
+version = otelProfilingVersion
 
 nexusPublishing {
     repositories {
@@ -51,7 +52,7 @@ publishing {
             from components.java
             groupId = 'io.pyroscope'
             artifactId = 'otel'
-            version = pyroscopeVersion
+            version = otelProfilingVersion
             pom {
                 name = 'Pyroscope OTEL integration'
                 description = 'Pyroscope OTEL integration'
