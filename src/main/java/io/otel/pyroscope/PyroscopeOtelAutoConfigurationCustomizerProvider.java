@@ -7,7 +7,7 @@ import io.pyroscope.javaagent.PyroscopeAgent;
 import io.pyroscope.javaagent.config.Config;
 
 @AutoService(AutoConfigurationCustomizerProvider.class)
-public class PyroscopeAutoConfigurationCustomizerProvider
+public class PyroscopeOtelAutoConfigurationCustomizerProvider
         implements AutoConfigurationCustomizerProvider {
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
@@ -17,8 +17,8 @@ public class PyroscopeAutoConfigurationCustomizerProvider
                 PyroscopeAgent.start(Config.build());
             }
             return tpBuilder.addSpanProcessor(
-                    new PyroscopeSpanProcessor(
-                            new PyroscopeConfiguration.Builder()
+                    new PyroscopeOtelSpanProcessor(
+                            new PyroscopeOtelConfiguration.Builder()
                                     .setAppName(cfg.getString("otel.pyroscope.app.name"))
                                     .setPyroscopeEndpoint(cfg.getString("otel.pyroscope.endpoint"))
                                     .setRootSpanOnly(cfg.getBoolean("otel.pyroscope.root.span.only", true))

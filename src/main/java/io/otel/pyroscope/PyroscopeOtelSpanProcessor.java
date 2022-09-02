@@ -17,10 +17,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 
-public class PyroscopeSpanProcessor implements SpanProcessor {
+public class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
-    public static final String LABEL_PROFILE_ID = "profile_id";
-    public static final String LABEL_SPAN_NAME = "span_name";
+    private static final String LABEL_PROFILE_ID = "profile_id";
+    private static final String LABEL_SPAN_NAME = "span_name";
 
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_URL = AttributeKey.stringKey("pyroscope.profile.url");
@@ -29,9 +29,9 @@ public class PyroscopeSpanProcessor implements SpanProcessor {
 
     private final Map<String, PyroscopeContextHolder> pyroscopeContexts = new ConcurrentHashMap<>();
 
-    private final PyroscopeConfiguration configuration;
+    private final PyroscopeOtelConfiguration configuration;
 
-    public PyroscopeSpanProcessor(PyroscopeConfiguration configuration) {
+    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration) {
         this.configuration = configuration;
     }
 
@@ -68,8 +68,11 @@ public class PyroscopeSpanProcessor implements SpanProcessor {
             return;
         }
         String profileId = span.getAttribute(ATTRIBUTE_KEY_PROFILE_ID);
+        if (profileId == null ) {
+            return;
+        }
         PyroscopeContextHolder pyroscopeContext = pyroscopeContexts.remove(profileId);
-        if (profileId == null || pyroscopeContext == null) {
+        if (pyroscopeContext == null) {
             return;
         }
         if (configuration.addProfileURL) {

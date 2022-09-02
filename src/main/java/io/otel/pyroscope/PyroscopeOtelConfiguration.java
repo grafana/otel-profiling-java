@@ -3,7 +3,7 @@ package io.otel.pyroscope;
 import java.util.Collections;
 import java.util.Map;
 
-public class PyroscopeConfiguration {
+public class PyroscopeOtelConfiguration {
     final String appName;
     final String pyroscopeEndpoint;
     final boolean rootSpanOnly;
@@ -12,7 +12,7 @@ public class PyroscopeConfiguration {
     final boolean addProfileBaselineURLs;
     final Map<String, String> profileBaselineLabels;
 
-    private PyroscopeConfiguration(Builder builder) {
+    private PyroscopeOtelConfiguration(Builder builder) {
         if (builder.appName == null) {
             throw new IllegalArgumentException("appName is required");
         }
@@ -74,8 +74,8 @@ public class PyroscopeConfiguration {
             return this;
         }
 
-        public PyroscopeConfiguration build() {
-            return new PyroscopeConfiguration(this);
+        public PyroscopeOtelConfiguration build() {
+            return new PyroscopeOtelConfiguration(this);
         }
     }
 }
