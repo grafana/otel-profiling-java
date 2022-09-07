@@ -49,9 +49,8 @@ dependencies {
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetryJavaagentAlpha}")
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
 
-    //Provides @AutoService annotation that makes registration of our SPI implementations much easier
-    compileOnly deps.autoservice
-    annotationProcessor deps.autoservice
+
+
 
 }
 
@@ -65,10 +64,6 @@ jar {
 }
 
 shadowJar {
-    exclude 'Log4j-*'
-    exclude 'META-INF/**'
-    exclude 'google/'
-
     archiveFileName = "pyroscope-otel.jar"
     relocate 'io.pyroscope', 'io.otel.pyroscope.shadow'
     archiveClassifier.set('')

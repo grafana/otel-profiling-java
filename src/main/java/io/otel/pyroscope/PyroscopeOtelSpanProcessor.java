@@ -10,11 +10,13 @@ import io.pyroscope.labels.LabelsSet;
 import io.pyroscope.labels.ScopedContext;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class PyroscopeOtelSpanProcessor implements SpanProcessor {
@@ -59,33 +61,60 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
         ScopedContext pyroscopeContext = new ScopedContext(new LabelsSet(labels));
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, profileId);
-        pyroscopeContexts.put(profileId, new PyroscopeContextHolder(profileId, pyroscopeContext, now()));
+        long now = now();
+        PyroscopeContextHolder pyroscopeContextHolder = new PyroscopeContextHolder(profileId, pyroscopeContext, now);
+        pyroscopeContexts.put(profileId, pyroscopeContextHolder);
+        if (configuration.optimisticTimestamps) {
+            long optimisticEnd = now + TimeUnit.HOURS.toMillis(1);
+            if (configuration.addProfileURL) {
+                span.setAttribute(ATTRIBUTE_KEY_PROFILE_URL, buildProfileUrl(pyroscopeContextHolder, optimisticEnd));
+            }
+            if (configuration.addProfileBaselineURLs) {
+                String q = buildComparisonQuery(pyroscopeContextHolder, optimisticEnd);
+                span.setAttribute(ATTRIBUTE_KEY_PROFILE_BASELINE_URL, configuration.pyroscopeEndpoint + "/comparison?" + q);
+                span.setAttribute(ATTRIBUTE_KEY_PROFILE_DIFF_URL, configuration.pyroscopeEndpoint + "/comparison-diff?" + q);
+            }
+        }
     }
 
     @Override
     public void onEnd(ReadableSpan span) {
-        if (!(span instanceof ReadWriteSpan)) {
-            return;
-        }
         String profileId = span.getAttribute(ATTRIBUTE_KEY_PROFILE_ID);
-        if (profileId == null ) {
+        if (profileId == null) {
             return;
         }
         PyroscopeContextHolder pyroscopeContext = pyroscopeContexts.remove(profileId);
         if (pyroscopeContext == null) {
             return;
         }
-        if (configuration.addProfileURL) {
-            ((ReadWriteSpan) span).setAttribute(ATTRIBUTE_KEY_PROFILE_URL, buildProfileUrl(pyroscopeContext));
+
+        try {
+            if (configuration.optimisticTimestamps) {
+                return;
+            }
+            if (sdkSpanInternals == null) {
+                return;
+            }
+            if (!(span instanceof ReadWriteSpan)) {
+                return;
+            }
+            long now = now();
+            if (configuration.addProfileURL) {
+                sdkSpanInternals.setAttribute(span, ATTRIBUTE_KEY_PROFILE_URL, buildProfileUrl(pyroscopeContext, now));
+            }
+            if (configuration.addProfileBaselineURLs) {
+                String q = buildComparisonQuery(pyroscopeContext, now);
+                sdkSpanInternals.setAttribute(span, ATTRIBUTE_KEY_PROFILE_BASELINE_URL, configuration.pyroscopeEndpoint + "/comparison?" + q);
+                sdkSpanInternals.setAttribute(span, ATTRIBUTE_KEY_PROFILE_DIFF_URL, configuration.pyroscopeEndpoint + "/comparison-diff?" + q);
+            }
+        } finally {
+            pyroscopeContext.ctx.close();
         }
-        if (configuration.addProfileBaselineURLs) {
-            addBaselineURLs((ReadWriteSpan) span, pyroscopeContext);
-        }
-        pyroscopeContext.ctx.close();
+
     }
 
 
-    private void addBaselineURLs(ReadWriteSpan span, PyroscopeContextHolder pyroscopeContext) {
+    private String buildComparisonQuery(PyroscopeContextHolder pyroscopeContext, long untilMilis) {
         StringBuilder qb = new StringBuilder();
         pyroscopeContext.ctx.forEach((k, v) -> {
             if (k.equals(LABEL_PROFILE_ID)) {
@@ -101,7 +130,7 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
         }
         StringBuilder query = new StringBuilder();
         String from = Long.toString(pyroscopeContext.startTimeMillis - 3600000);
-        String until = Long.toString(now());
+        String until = Long.toString(untilMilis);
         String baseLineQuery = String.format("%s{%s}", configuration.appName, qb.toString());
         query.append("query=").append(urlEncode(baseLineQuery));
         query.append("&from=").append(from);
@@ -114,10 +143,7 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
         query.append("&rightQuery=").append(urlEncode(String.format("%s{%s=\"%s\"}", configuration.appName, LABEL_PROFILE_ID, pyroscopeContext.profileId)));
         query.append("&rightFrom=").append(from);
         query.append("&rightUntil=").append(until);
-
-        String strQuery = query.toString();
-        span.setAttribute(ATTRIBUTE_KEY_PROFILE_BASELINE_URL, configuration.pyroscopeEndpoint + "/comparison?" + strQuery);
-        span.setAttribute(ATTRIBUTE_KEY_PROFILE_DIFF_URL, configuration.pyroscopeEndpoint + "/comparison-diff?" + strQuery);
+        return query.toString();
     }
 
     private void writeLabel(StringBuilder sb, String k, String v) {
@@ -127,12 +153,12 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
         sb.append(k).append("=\"").append(v).append("\"");
     }
 
-    private String buildProfileUrl(PyroscopeContextHolder pyroscopeContext) {
+    private String buildProfileUrl(PyroscopeContextHolder pyroscopeContext, long untilMillis) {
         String query = String.format("%s{%s=\"%s\"}", configuration.appName, LABEL_PROFILE_ID, pyroscopeContext.profileId);
         return String.format("%s?query=%s&from=%d&until=%d", configuration.pyroscopeEndpoint,
                 urlEncode(query),
                 pyroscopeContext.startTimeMillis,
-                now()
+                untilMillis
         );
     }
 
@@ -165,5 +191,59 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
         boolean noParent = parent == SpanContext.getInvalid();
         boolean remote = parent.isRemote();
         return remote || noParent;
+    }
+
+    private static final SdkSpanInternals sdkSpanInternals;
+
+    static {
+        SdkSpanInternals internals;
+        try {
+            internals = new SdkSpanInternals();
+        } catch (ClassNotFoundException | NoSuchFieldException e) {
+            internals = null;
+        }
+        sdkSpanInternals = internals;
+    }
+
+    private static class SdkSpanInternals {
+        final Field lock; // Object
+        final Field attributes; // AttributesMap
+        final AtomicBoolean error = new AtomicBoolean(false);
+
+        public SdkSpanInternals() throws ClassNotFoundException, NoSuchFieldException {
+            Class<?> cls = Class.forName("io.opentelemetry.sdk.trace.SdkSpan");
+            lock = cls.getDeclaredField("lock");
+            attributes = cls.getDeclaredField("attributes");
+            lock.setAccessible(true);
+            attributes.setAccessible(true);
+        }
+
+        <T> void setAttribute(ReadableSpan span, AttributeKey<T> key, T value) {
+            if (error.get()) {
+                return;
+            }
+            final Object lock;
+            try {
+                lock = this.lock.get(span);
+            } catch (IllegalAccessException e) {
+                if (error.compareAndSet(false, true)) {
+                    e.printStackTrace();
+                }
+                return;
+            }
+            final HashMap attributes;
+            try {
+                attributes = (HashMap) this.attributes.get(span);
+            } catch (IllegalAccessException | ClassCastException e) {
+                if (error.compareAndSet(false, true)) {
+                    e.printStackTrace();
+                }
+                return;
+            }
+            synchronized (lock) {
+                attributes.put(key, value);
+            }
+        }
+
     }
 }
