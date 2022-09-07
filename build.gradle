@@ -3,8 +3,22 @@ plugins {
     id 'maven-publish'
     id 'signing'
     id 'io.github.gradle-nexus.publish-plugin' version '1.1.0'
+    id "com.github.johnrengelman.shadow" version "7.1.2"
 }
 
+
+ext {
+    versions = [
+            opentelemetry              : "1.17.0",
+
+
+            opentelemetryJavaagentAlpha: "1.17.0-alpha",
+    ]
+
+    deps = [
+            autoservice: dependencies.create(group: 'com.google.auto.service', name: 'auto-service', version: '1.0.1')
+    ]
+}
 
 def pyroscopeVersion = project.properties['pyroscope_version']
 def otelProfilingVersion = project.properties['otel_profiling_version']
@@ -25,15 +39,19 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenCentral()
-    maven { url = "https://s01.oss.sonatype.org/content/repositories/snapshots/" } //todo do not commit
 }
 
 
 dependencies {
     implementation("io.pyroscope:agent:$pyroscopeVersion")
-    implementation platform("io.opentelemetry:opentelemetry-bom:1.15.0")
-    implementation('io.opentelemetry:opentelemetry-api')
-    implementation('io.opentelemetry:opentelemetry-sdk')
+
+    compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
+    compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetryJavaagentAlpha}")
+    compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
+
+
+
+
 }
 
 java {
@@ -45,14 +63,20 @@ jar {
     
 }
 
+shadowJar {
+    archiveFileName = "pyroscope-otel.jar"
+    relocate 'io.pyroscope', 'io.otel.pyroscope.shadow'
+    archiveClassifier.set('')
+}
 
 publishing {
     publications {
         mavenJava(MavenPublication) { publication ->
-            from components.java
+            project.shadow.component(publication)
             groupId = 'io.pyroscope'
             artifactId = 'otel'
             version = otelProfilingVersion
+            artifacts = [ shadowJar, javadocJar, sourcesJar ]
             pom {
                 name = 'Pyroscope OTEL integration'
                 description = 'Pyroscope OTEL integration'
