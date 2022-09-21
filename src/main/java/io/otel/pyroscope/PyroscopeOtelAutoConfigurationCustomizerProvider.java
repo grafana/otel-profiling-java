@@ -5,10 +5,11 @@ import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.pyroscope.javaagent.PyroscopeAgent;
 import io.pyroscope.javaagent.config.Config;
-import io.pyroscope.javaagent.impl.DefaultConfigurationProvider;
 
 import java.util.Map;
 
+import static io.otel.pyroscope.OtelCompat.getBoolean;
+import static io.otel.pyroscope.OtelCompat.getString;
 import static io.pyroscope.javaagent.config.AppName.*;
 
 
@@ -25,7 +26,7 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
-            boolean startProfiling = cfg.getBoolean("otel.pyroscope.start.profiling", true);
+            boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
 
             String appName = cfg.getString(CONFIG_APP_NAME);
             String endpoint = cfg.getString(CONFIG_ENDPOINT);
@@ -54,17 +55,16 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
                     }
                 }
             }
-            System.out.println(endpoint + " endpoint");
-            Map<String, String> labels = parseLabels(cfg.getString(CONFIG_BASELINE_LABELS, ""));
+            Map<String, String> labels = parseLabels(getString(cfg, CONFIG_BASELINE_LABELS, ""));
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
                     .setAppName(appName)
                     .setPyroscopeEndpoint(endpoint)
                     .setProfileBaselineLabels(labels)
-                    .setRootSpanOnly(cfg.getBoolean("otel.pyroscope.root.span.only", true))
-                    .setAddSpanName(cfg.getBoolean("otel.pyroscope.add.span.name", true))
-                    .setAddProfileURL(cfg.getBoolean("otel.pyroscope.add.profile.url", true))
-                    .setAddProfileBaselineURLs(cfg.getBoolean("otel.pyroscope.add.profile.baseline.url", true))
-                    .setOptimisticTimestamps(cfg.getBoolean("otel.pyroscope.optimistic.timestamps", true))
+                    .setRootSpanOnly(getBoolean(cfg, "otel.pyroscope.root.span.only", true))
+                    .setAddSpanName(getBoolean(cfg, "otel.pyroscope.add.span.name", true))
+                    .setAddProfileURL(getBoolean(cfg, "otel.pyroscope.add.profile.url", true))
+                    .setAddProfileBaselineURLs(getBoolean(cfg, "otel.pyroscope.add.profile.baseline.url", true))
+                    .setOptimisticTimestamps(getBoolean(cfg, "otel.pyroscope.optimistic.timestamps", true))
                     .build();
             return tpBuilder.addSpanProcessor(
                     new PyroscopeOtelSpanProcessor(
