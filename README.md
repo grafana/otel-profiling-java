@@ -7,7 +7,7 @@ link traces with the profiling data, and find specific lines of code related to 
 * Because of how sampling profilers work, spans shorter than the sample interval may not be captured. By default pyroscope CPU profiler probes stack traces 100 times per second, meaning that spans shorter than 10ms may not be captured.
 
 
-Java code can be easily instrumented with otel-pyroscope package -
+Java code can be easily instrumented with otel-profiling-java package -
 a `OpenTelemetry` implementation, that annotates profiling data with span IDs which makes it possible to filter
 out profile of a particular trace span in Pyroscope:
 
