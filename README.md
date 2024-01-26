@@ -60,7 +60,7 @@ try (Scope s = span.makeCurrent()){
 - `otel.pyroscope.root.span.only` - Boolean flag. When enabled, the tracer will annotate only the first span created locally
 (the root span), but the profile will include samples of all the nested spans. This may be helpful in case if the trace
 consists of multiple spans shorter than 10ms and profiler can't collect and annotate samples properly. Default: `true`.
-- `tel.pyroscope.add.span.name` - Boolean flag. Controls whether the span name added to profile labels. Default: `true`.
+- `otel.pyroscope.add.span.name` - Boolean flag. Controls whether the span name added to profile labels. Default: `true`.
 
 ## Examples
 
