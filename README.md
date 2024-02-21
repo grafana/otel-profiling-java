@@ -12,7 +12,7 @@ a `OpenTelemetry` implementation, that annotates profiling data with span IDs wh
 out profile of a particular trace span in Pyroscope:
 
 ### Running as otel-java-instrumentation extension
-Download latest `opentelemetry-javaagent.jar` and `pyroscope-otel.jar`
+Download latest [`opentelemetry-javaagent.jar`](https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases) and [`pyroscope-otel.jar`](https://maven.org/maven2/io/pyroscope/otel)
 ```bash
 java -jar ./build/libs/rideshare-1.0-SNAPSHOT.jar \
     -javaagent:./opentelemetry-javaagent.jar \
@@ -29,7 +29,7 @@ java -jar ./build/libs/rideshare-1.0-SNAPSHOT.jar \
 
 ```javascript
 // Add latest pyroscope otel depedency
-implementation("io.pyroscope:otel:0.10.1.1")
+implementation("io.pyroscope:otel:0.10.1.4")
 ```
 
 Now we can create and configure the tracer provider:
