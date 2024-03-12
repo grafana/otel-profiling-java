@@ -29,7 +29,7 @@ java -jar ./build/libs/rideshare-1.0-SNAPSHOT.jar \
 
 ```javascript
 // Add latest pyroscope otel depedency
-implementation("io.pyroscope:otel:0.10.1.4")
+implementation("io.pyroscope:otel:0.10.1.11")
 ```
 
 Now we can create and configure the tracer provider:
