@@ -14,7 +14,7 @@ publish:
 		-PsonatypePassword="$(NEXUS_PASSWORD)" \
 		-Psigning.secretKeyRingFile="$(NEXUS_GPG_SECRING_FILE)" \
 		-Psigning.password="$(NEXUS_GPG_PASSWORD)" \
-		-Psigning.keyId="$(NEXUS_GPG_KEY_ID)"
+		-Psigning.keyId="$(NEXUS_GPG_KEY_ID)" --debug
 	
 
 .PHONY: test
