@@ -55,7 +55,6 @@ dependencies {
 }
 
 java {
-    withJavadocJar()
     withSourcesJar()
 }
 
