@@ -55,6 +55,7 @@ dependencies {
 }
 
 java {
+    withJavadocJar()
     withSourcesJar()
 }
 
@@ -75,7 +76,7 @@ publishing {
             groupId = 'io.pyroscope'
             artifactId = 'otel'
             version = otelProfilingVersion
-            artifacts = [ shadowJar, sourcesJar ]
+            artifacts = [ shadowJar, javadocJar, sourcesJar ]
             pom {
                 name = 'Pyroscope OTEL integration'
                 description = 'Pyroscope OTEL integration'
