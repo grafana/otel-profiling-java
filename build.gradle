@@ -75,7 +75,7 @@ publishing {
             groupId = 'io.pyroscope'
             artifactId = 'otel'
             version = otelProfilingVersion
-            artifacts = [ shadowJar, javadocJar, sourcesJar ]
+            artifacts = [ shadowJar, sourcesJar ]
             pom {
                 name = 'Pyroscope OTEL integration'
                 description = 'Pyroscope OTEL integration'
