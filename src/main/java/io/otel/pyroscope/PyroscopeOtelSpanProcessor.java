@@ -6,6 +6,9 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
+
+import io.pyroscope.javaagent.api.ProfilerScopedContext;
+import io.pyroscope.javaagent.impl.ProfilerScopedContextWrapper;
 import io.pyroscope.labels.LabelsSet;
 import io.pyroscope.labels.ScopedContext;
 
@@ -32,9 +35,11 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
     private final Map<String, PyroscopeContextHolder> pyroscopeContexts = new ConcurrentHashMap<>();
 
     private final PyroscopeOtelConfiguration configuration;
+    private final OtelProfilerSdkBridge profilerSdk;
 
-    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration) {
+    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration, OtelProfilerSdkBridge profilerSdk) {
         this.configuration = configuration;
+        this.profilerSdk = profilerSdk;
     }
 
     @Override
@@ -59,10 +64,10 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
             labels.put(LABEL_SPAN_NAME, span.getName());
         }
 
-        ScopedContext pyroscopeContext = new ScopedContext(new LabelsSet(labels));
+        ProfilerScopedContext scopedContext = createScopedContext(labels);
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, profileId);
         long now = now();
-        PyroscopeContextHolder pyroscopeContextHolder = new PyroscopeContextHolder(profileId, pyroscopeContext, now);
+        PyroscopeContextHolder pyroscopeContextHolder = new PyroscopeContextHolder(profileId, scopedContext, now);
         pyroscopeContexts.put(profileId, pyroscopeContextHolder);
         if (configuration.optimisticTimestamps) {
             long optimisticEnd = now + TimeUnit.HOURS.toMillis(1);
@@ -75,6 +80,13 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
                 span.setAttribute(ATTRIBUTE_KEY_PROFILE_DIFF_URL, configuration.pyroscopeEndpoint + "/comparison-diff?" + q);
             }
         }
+    }
+
+    private ProfilerScopedContext createScopedContext(Map<String, String> labels) {
+        if (profilerSdk == null) {
+            return new ProfilerScopedContextWrapper(new ScopedContext(new LabelsSet(labels)));
+        }
+        return profilerSdk.createScopedContext(labels);
     }
 
     @Override
@@ -110,13 +122,11 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
         } finally {
             pyroscopeContext.ctx.close();
         }
-
     }
-
 
     private String buildComparisonQuery(PyroscopeContextHolder pyroscopeContext, long untilMilis) {
         StringBuilder qb = new StringBuilder();
-        pyroscopeContext.ctx.forEach((k, v) -> {
+        pyroscopeContext.ctx.forEachLabel((k, v) -> {
             if (k.equals(LABEL_PROFILE_ID)) {
                 return;
             }
@@ -176,10 +186,10 @@ public class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     private static class PyroscopeContextHolder {
         final String profileId;
-        final ScopedContext ctx;
+        final ProfilerScopedContext ctx;
         final long startTimeMillis;
 
-        PyroscopeContextHolder(String profileId, ScopedContext ctx, long startTimeMillis) {
+        PyroscopeContextHolder(String profileId, ProfilerScopedContext ctx, long startTimeMillis) {
             this.profileId = profileId;
             this.ctx = ctx;
             this.startTimeMillis = startTimeMillis;
