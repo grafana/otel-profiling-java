@@ -59,7 +59,9 @@ jar {
 
 shadowJar {
     archiveFileName = "pyroscope-otel.jar"
-    relocate 'io.pyroscope', 'io.otel.pyroscope.shadow'
+    relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
+        exclude 'io.pyroscope.javaagent.ProfilerSdk'
+    }
     archiveClassifier.set('')
 }
 
