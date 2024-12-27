@@ -9,7 +9,7 @@ build:
 .PHONY: publish
 publish:
 	@echo "./gradlew clean assemble publishToSonatype closeAndReleaseSonatypeStagingRepository"
-	@./gradlew clean assemble publishToSonatype closeAndReleaseSonatypeStagingRepository \
+	@./gradlew clean assemble publishToSonatype \
 		-PsonatypeUsername="$(NEXUS_USERNAME)" \
 		-PsonatypePassword="$(NEXUS_PASSWORD)" \
 		-Psigning.secretKeyRingFile="$(NEXUS_GPG_SECRING_FILE)" \
