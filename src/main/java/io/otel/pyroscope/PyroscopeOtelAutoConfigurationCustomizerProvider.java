@@ -14,29 +14,58 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
 
     public static final String CONFIG_APP_NAME = "otel.pyroscope.app.name";
     public static final String CONFIG_ENDPOINT = "otel.pyroscope.endpoint";
-
-    private static final String PYROSCOPE_APPLICATION_NAME_CONFIG = "pyroscope.application.name";
-    private static final String PYROSCOPE_SERVER_ADDRESS_CONFIG = "pyroscope.server.address";
     public static final String CONFIG_BASELINE_LABELS = "otel.pyroscope.baseline.labels";
 
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
+            OtelProfilerSdkBridge profilerSdk = null;
+            try {
+                profilerSdk = loadProfilerSdk();
+            } catch (Exception e) {
+                // This usually means we are running without the Pyroscope SDK.
+                // We'll instead use the Profiler bundled with the extension.
+                System.out.println("Could not load the profiler SDK, will continue with the built-in one!");
+            }
+
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                Config pyroConfig = Config.build();
-                PyroscopeAgent.start(pyroConfig);
+                if (profilerSdk == null) {
+                    PyroscopeAgent.start(Config.build());
+                } else if (!profilerSdk.isProfilingStarted()) {
+                    profilerSdk.startProfiling();
+                }
             }
+
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
                     .setRootSpanOnly(getBoolean(cfg, "otel.pyroscope.root.span.only", true))
                     .setAddSpanName(getBoolean(cfg, "otel.pyroscope.add.span.name", true))
                     .build();
+
             return tpBuilder.addSpanProcessor(
                     new PyroscopeOtelSpanProcessor(
-                            pyroOtelConfig
+                            pyroOtelConfig,
+                            profilerSdk
                     ));
         });
+    }
 
+    /**
+     * Open Telemetry extension classes are loaded by an isolated class loader.
+     * As such, they can't communicate with other parts of the application (e.g., the Pyroscope SDK).
+     *
+     * If the Pyroscope SDK is loaded as a java agent, we'll access it via the system class loader and interact with it
+     * via a bridge.
+     */
+    private static OtelProfilerSdkBridge loadProfilerSdk() {
+        try {
+            ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+            Class<?> sdkClass = systemClassLoader.loadClass("io.pyroscope.javaagent.ProfilerSdk");
+            Object sdk = sdkClass.getDeclaredConstructor().newInstance();
+            return new OtelProfilerSdkBridge(sdk);
+        } catch (Exception e) {
+            throw new RuntimeException("Error loading the profiler SDK", e);
+        }
     }
 
 }

@@ -10,8 +10,6 @@ plugins {
 ext {
     versions = [
             opentelemetry              : "1.17.0",
-
-
             opentelemetryJavaagentAlpha: "1.17.0-alpha",
     ]
 
@@ -48,10 +46,6 @@ dependencies {
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetryJavaagentAlpha}")
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
-
-
-
-
 }
 
 java {
@@ -60,12 +54,14 @@ java {
 }
 
 jar {
-    
+
 }
 
 shadowJar {
     archiveFileName = "pyroscope-otel.jar"
-    relocate 'io.pyroscope', 'io.otel.pyroscope.shadow'
+    relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
+        exclude 'io.pyroscope.javaagent.ProfilerSdk'
+    }
     archiveClassifier.set('')
 }
 
