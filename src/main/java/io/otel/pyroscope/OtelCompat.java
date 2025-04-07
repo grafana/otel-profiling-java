@@ -12,14 +12,4 @@ public class OtelCompat {
         }
         return v;
     }
-
-    // For compat reasons
-    // io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties.getString(java.lang.String, java.lang.String) is only since 1.15
-    static String getString(ConfigProperties cfg, String name, String defaultValue) {
-        String v = cfg.getString(name);
-        if (v == null) {
-            return defaultValue;
-        }
-        return v;
-    }
 }
