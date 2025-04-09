@@ -12,9 +12,6 @@ import static io.otel.pyroscope.OtelCompat.getBoolean;
 public class PyroscopeOtelAutoConfigurationCustomizerProvider
         implements AutoConfigurationCustomizerProvider {
 
-    public static final String CONFIG_APP_NAME = "otel.pyroscope.app.name";
-    public static final String CONFIG_ENDPOINT = "otel.pyroscope.endpoint";
-    public static final String CONFIG_BASELINE_LABELS = "otel.pyroscope.baseline.labels";
 
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
@@ -53,7 +50,7 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     /**
      * Open Telemetry extension classes are loaded by an isolated class loader.
      * As such, they can't communicate with other parts of the application (e.g., the Pyroscope SDK).
-     *
+     * <p>
      * If the Pyroscope SDK is loaded as a java agent, we'll access it via the system class loader and interact with it
      * via a bridge.
      */
