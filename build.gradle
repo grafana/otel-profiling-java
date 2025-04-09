@@ -41,8 +41,7 @@ repositories {
 
 
 dependencies {
-    //implementation("io.pyroscope:agent:$pyroscopeVersion")
-    implementation(files('/home/korniltsev/p/pyroscope-java/agent/build/libs/pyroscope.jar'))
+    implementation("io.pyroscope:agent:$pyroscopeVersion")
 
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetryJavaagentAlpha}")
