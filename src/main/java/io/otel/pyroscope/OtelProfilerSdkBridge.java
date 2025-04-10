@@ -10,9 +10,12 @@ import java.util.function.BiConsumer;
 public class OtelProfilerSdkBridge implements ProfilerApi {
 
     private final Object sdkInstance;
+    private final Method registerConstant;
 
-    public OtelProfilerSdkBridge(Object sdkInstance) {
+
+    public OtelProfilerSdkBridge(Object sdkInstance, Method registerConstant) {
         this.sdkInstance = sdkInstance;
+        this.registerConstant = registerConstant;
     }
 
     @Override
@@ -66,6 +69,25 @@ public class OtelProfilerSdkBridge implements ProfilerApi {
 
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void setTracingContext(long profileId, long spanName) {
+        try {
+            Method method = sdkInstance.getClass().getDeclaredMethod("setTracingContext", long.class, long.class);
+            method.invoke(sdkInstance, profileId, spanName);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public long registerConstant(String s) {
+        try {
+            return (Long) registerConstant.invoke(null, s);
+        } catch (Exception e) {
+            return 0;
         }
     }
 }

@@ -6,6 +6,9 @@ import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvide
 import io.pyroscope.javaagent.PyroscopeAgent;
 import io.pyroscope.javaagent.config.Config;
 
+import java.lang.reflect.Method;
+import java.util.Base64;
+
 import static io.otel.pyroscope.OtelCompat.getBoolean;
 
 
@@ -22,7 +25,9 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             } catch (Exception e) {
                 // This usually means we are running without the Pyroscope SDK.
                 // We'll instead use the Profiler bundled with the extension.
+                // todo do not print or at least silence this by default
                 System.out.println("Could not load the profiler SDK, will continue with the built-in one!");
+                //e.printStackTrace();
             }
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
@@ -59,10 +64,18 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
             Class<?> sdkClass = systemClassLoader.loadClass("io.pyroscope.javaagent.ProfilerSdk");
             Object sdk = sdkClass.getDeclaredConstructor().newInstance();
-            return new OtelProfilerSdkBridge(sdk);
+
+            Class<?> labelsWrapperClass = systemClassLoader.loadClass(getLabelsWrapperClassName());
+            Method registerConstant = labelsWrapperClass.getDeclaredMethod("registerConstant", String.class);
+
+            return new OtelProfilerSdkBridge(sdk, registerConstant);
         } catch (Exception e) {
             throw new RuntimeException("Error loading the profiler SDK", e);
         }
     }
 
+    private static String getLabelsWrapperClassName() {
+        // otherwise the relocate plugin renames this string :shrug:
+        return new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmxhYmVscy52Mi5QeXJvc2NvcGUkTGFiZWxzV3JhcHBlcg=="));
+    }
 }
