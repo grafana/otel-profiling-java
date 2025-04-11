@@ -2,6 +2,7 @@ package io.otel.pyroscope;
 
 
 public class PyroscopeOtelConfiguration {
+    //todo think about removing both options, so that users don't need to configure or think about anything
     final boolean rootSpanOnly;
     final boolean addSpanName;
 

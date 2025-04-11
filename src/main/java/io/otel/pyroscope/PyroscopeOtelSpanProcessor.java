@@ -7,31 +7,27 @@ import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
-import io.pyroscope.javaagent.api.ProfilerScopedContext;
-import io.pyroscope.javaagent.impl.ProfilerScopedContextWrapper;
-import io.pyroscope.labels.v2.LabelsSet;
-import io.pyroscope.labels.v2.ScopedContext;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import io.pyroscope.PyroscopeAsyncProfiler;
+import io.pyroscope.labels.v2.Pyroscope;
+import io.pyroscope.vendor.one.profiler.AsyncProfiler;
 
 
 public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
-    private static final String LABEL_PROFILE_ID = "profile_id";
-    private static final String LABEL_SPAN_NAME = "span_name";
-
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
-
-    private final Map<String, ProfilerScopedContext> pyroscopeContexts = new ConcurrentHashMap<>();
 
     private final PyroscopeOtelConfiguration configuration;
     private final OtelProfilerSdkBridge profilerSdk;
+    private final AsyncProfiler asprof;
 
     public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration, OtelProfilerSdkBridge profilerSdk) {
         this.configuration = configuration;
         this.profilerSdk = profilerSdk;
+        if (profilerSdk == null) {
+            asprof = PyroscopeAsyncProfiler.getAsyncProfiler();
+        } else {
+            asprof = null;
+        }
     }
 
     @Override
@@ -49,38 +45,50 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         if (configuration.rootSpanOnly && !isRootSpan(span)) {
             return;
         }
-        Map<String, String> labels = new HashMap<>();
-        String profileId = span.getSpanContext().getSpanId();
-        labels.put(LABEL_PROFILE_ID, profileId);
+        String strProfileId = span.getSpanContext().getSpanId();
+        long spanName;
+        long spanId = parseSpanId(strProfileId);
         if (configuration.addSpanName) {
-            labels.put(LABEL_SPAN_NAME, span.getName());
+            spanName = registerConstant(span.getName());
+        } else {
+            spanName = 0;
         }
 
-        ProfilerScopedContext scopedContext = createScopedContext(labels);
-        span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, profileId);
-        pyroscopeContexts.put(profileId, scopedContext);
+        System.out.println(spanId );
+        System.out.println(span);
+
+        span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
+        setTracingContextForSpan(spanId, spanName);
     }
 
 
     @Override
     public void onEnd(ReadableSpan span) {
-        String profileId = span.getAttribute(ATTRIBUTE_KEY_PROFILE_ID);
-        if (profileId == null) {
-            return;
-        }
-        ProfilerScopedContext pyroscopeContext = pyroscopeContexts.remove(profileId);
-        if (pyroscopeContext == null) {
-            return;
-        }
-
-        pyroscopeContext.close();
+        setTracingContextForSpan(0, 0);
     }
 
-    private ProfilerScopedContext createScopedContext(Map<String, String> labels) {
-        if (profilerSdk == null) {
-            return new ProfilerScopedContextWrapper(new ScopedContext(new LabelsSet(labels)));
+    private void setTracingContextForSpan(long spanId, long spanName) {
+        if (profilerSdk != null) {
+            profilerSdk.setTracingContext(spanId, spanName);
         }
-        return profilerSdk.createScopedContext(labels);
+        if (asprof != null) {
+            asprof.setTracingContext(spanId, spanName);
+        }
+    }
+
+    private  long registerConstant(String name) {
+        if (profilerSdk != null) {
+            return profilerSdk.registerConstant(name);
+        }
+        return Pyroscope.LabelsWrapper.registerConstant(name);
+    }
+
+
+    public static long parseSpanId(String strProfileId) {
+        if (strProfileId.length() != 16) {
+            return 0L;
+        }
+        return Long.parseLong(strProfileId, 16);
     }
 
     public static boolean isRootSpan(ReadableSpan span) {
