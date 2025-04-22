@@ -54,9 +54,6 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
             spanName = 0;
         }
 
-        System.out.println(spanId );
-        System.out.println(span);
-
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
         setTracingContextForSpan(spanId, spanName);
     }
@@ -85,10 +82,14 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
 
     public static long parseSpanId(String strProfileId) {
-        if (strProfileId.length() != 16) {
+        if (strProfileId == null || strProfileId.length() != 16) {
             return 0L;
         }
-        return Long.parseLong(strProfileId, 16);
+        try {
+            return Long.parseUnsignedLong(strProfileId, 16);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     public static boolean isRootSpan(ReadableSpan span) {
