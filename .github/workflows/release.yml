@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-x64
     steps:
       - name: Get secrets
         uses: grafana/shared-workflows/actions/get-vault-secrets@8fa210559ab2cc62e7b12d3bb9cba19dbc862c11
