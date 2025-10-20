@@ -10,7 +10,7 @@ plugins {
 ext {
     versions = [
             opentelemetry              : "1.17.0",
-            opentelemetryJavaagentAlpha: "1.17.0-alpha",
+            opentelemetryJavaagentAlpha: "1.33.6",
     ]
 
     deps = [
