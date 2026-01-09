@@ -5,23 +5,27 @@ public class PyroscopeOtelConfiguration {
     //todo think about removing both options, so that users don't need to configure or think about anything
     final boolean rootSpanOnly;
     final boolean addSpanName;
+    final boolean contextPropagationEnabled;
 
     private PyroscopeOtelConfiguration(Builder builder) {
         this.rootSpanOnly = builder.rootSpanOnly;
         this.addSpanName = builder.addSpanName;
+        this.contextPropagationEnabled = builder.contextPropagationEnabled;
     }
 
     @Override
     public String toString() {
         return "PyroscopeOtelConfiguration{" +
-                ", rootSpanOnly=" + rootSpanOnly +
+                "rootSpanOnly=" + rootSpanOnly +
                 ", addSpanName=" + addSpanName +
+                ", contextPropagationEnabled=" + contextPropagationEnabled +
                 '}';
     }
 
     public static class Builder {
         boolean rootSpanOnly = true;
         boolean addSpanName = true;
+        boolean contextPropagationEnabled = true;
 
         public Builder() {
         }
@@ -33,6 +37,11 @@ public class PyroscopeOtelConfiguration {
 
         public Builder setAddSpanName(boolean addSpanName) {
             this.addSpanName = addSpanName;
+            return this;
+        }
+
+        public Builder setContextPropagationEnabled(boolean contextPropagationEnabled) {
+            this.contextPropagationEnabled = contextPropagationEnabled;
             return this;
         }
 

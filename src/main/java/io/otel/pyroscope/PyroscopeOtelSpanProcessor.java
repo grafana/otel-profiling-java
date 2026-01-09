@@ -61,7 +61,16 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     @Override
     public void onEnd(ReadableSpan span) {
-        setTracingContextForSpan(0, 0);
+        // Restore parent span context instead of clearing completely
+        SpanContext parentContext = span.getParentSpanContext();
+        if (parentContext.isValid() && !parentContext.isRemote()) {
+            long parentSpanId = parseSpanId(parentContext.getSpanId());
+            // Note: we don't have parent span name, so use 0
+            setTracingContextForSpan(parentSpanId, 0);
+        } else {
+            // Root span ended, clear context
+            setTracingContextForSpan(0, 0);
+        }
     }
 
     private void setTracingContextForSpan(long spanId, long spanName) {
