@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-x64
     steps:
       - name: Get secrets
-        uses: grafana/shared-workflows/actions/get-vault-secrets@5cfbfd5d1cedbc711fc9358744a6d46b37eb88ee
+        uses: grafana/shared-workflows/actions/get-vault-secrets@f8d38df9065ff1beb3c670acb5c0efacd9299f97
         with:
           repo_secrets: |
             NEXUS_USERNAME=publishing:nexus_username
