@@ -1,17 +1,10 @@
-name: Release
+name: Publish Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version_bump:
-        description: 'Version Bump Type'
-        required: true
-        default: 'minor'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+  push:
+    branches: [main]
+    paths:
+      - 'gradle.properties'
 
 permissions:
   contents: write
@@ -19,10 +12,26 @@ permissions:
   id-token: write
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-x64
     steps:
+      - name: Check if release commit
+        id: check
+        run: |
+          COMMIT_MSG=$(cat "$GITHUB_EVENT_PATH" | jq -r '.head_commit.message')
+          # Match "version X.Y.Z" (merge/rebase) or "Release vX.Y.Z" (squash merge)
+          if [[ "$COMMIT_MSG" =~ ^version\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          elif [[ "$COMMIT_MSG" =~ ^Release\ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Get secrets
+        if: steps.check.outputs.is_release == 'true'
         uses: grafana/shared-workflows/actions/get-vault-secrets@5cfbfd5d1cedbc711fc9358744a6d46b37eb88ee
         with:
           repo_secrets: |
@@ -35,6 +44,7 @@ jobs:
             GITHUB_APP_PRIVATE_KEY=pyroscope-development-app:app-private-key
 
       - name: Generate GitHub token
+        if: steps.check.outputs.is_release == 'true'
         uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         id: app-token
         with:
@@ -42,48 +52,21 @@ jobs:
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
 
       - name: Checkout code
+        if: steps.check.outputs.is_release == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           token: ${{ steps.app-token.outputs.token }}
-          persist-credentials: true # push the tag later
+          persist-credentials: true
 
       - name: Set up Java 8
+        if: steps.check.outputs.is_release == 'true'
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           java-version: '8'
           distribution: 'temurin'
 
-      - name: Bump Version
-        id: bump_version
-        env:
-          VERSION_BUMP: ${{ inputs.version_bump }}
-        run: |
-          current_version=$(grep 'otel_profiling_version=' gradle.properties | cut -d'=' -f2)
-          echo "Current version: $current_version"
-          IFS='.' read -r major minor patch <<< "$current_version"
-
-          case "$VERSION_BUMP" in
-            "major")
-              major=$((major + 1))
-              minor=0
-              patch=0
-              ;;
-            "minor")
-              minor=$((minor + 1))
-              patch=0
-              ;;
-            "patch")
-              patch=$((patch + 1))
-              ;;
-          esac
-
-          new_version="${major}.${minor}.${patch}"
-          echo "New version: $new_version"
-
-          sed -i "s/otel_profiling_version=.*/otel_profiling_version=$new_version/" gradle.properties
-          echo "version=$new_version" >> $GITHUB_OUTPUT
-
       - name: Prepare GPG Keyring
+        if: steps.check.outputs.is_release == 'true'
         id: prepare_gpg_keyring
         run: |
           mkdir -p ${{ github.workspace }}/gpg
@@ -92,32 +75,34 @@ jobs:
           echo "keyring_path=${{ github.workspace }}/gpg/secring.gpg" >> $GITHUB_OUTPUT
 
       - name: Build and Publish
+        if: steps.check.outputs.is_release == 'true'
         run: |
           export NEXUS_GPG_SECRING_FILE=${{ steps.prepare_gpg_keyring.outputs.keyring_path }}
           make publish
 
       - name: Get GitHub App User ID
+        if: steps.check.outputs.is_release == 'true'
         id: get-user-id
         run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      - name: Commit Version Bump
+      - name: Create Tag
+        if: steps.check.outputs.is_release == 'true'
         run: |
           git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
           git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
-          git add gradle.properties
-          git commit -m "version ${{ steps.bump_version.outputs.version }}"
-          git tag "v${{ steps.bump_version.outputs.version }}"
-          git push --atomic origin "refs/heads/main" "refs/tags/v${{ steps.bump_version.outputs.version }}"
+          git tag "v${{ steps.check.outputs.version }}"
+          git push origin "v${{ steps.check.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Create GitHub Release
+        if: steps.check.outputs.is_release == 'true'
         run: |
-          gh release create "v${{ steps.bump_version.outputs.version }}" \
+          gh release create "v${{ steps.check.outputs.version }}" \
             build/libs/pyroscope-otel.jar \
-            --title "Release v${{ steps.bump_version.outputs.version }}" \
+            --title "Release v${{ steps.check.outputs.version }}" \
             --notes "Automated release"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

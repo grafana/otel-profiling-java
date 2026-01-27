@@ -1,0 +1,103 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version Bump Type'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-x64
+    steps:
+      - name: Get secrets
+        uses: grafana/shared-workflows/actions/get-vault-secrets@5cfbfd5d1cedbc711fc9358744a6d46b37eb88ee
+        with:
+          repo_secrets: |
+            GITHUB_APP_ID=pyroscope-development-app:app-id
+            GITHUB_APP_PRIVATE_KEY=pyroscope-development-app:app-private-key
+
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        id: app-token
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Bump Version
+        id: bump_version
+        env:
+          VERSION_BUMP: ${{ inputs.version_bump }}
+        run: |
+          current_version=$(grep 'otel_profiling_version=' gradle.properties | cut -d'=' -f2)
+          echo "Current version: $current_version"
+          IFS='.' read -r major minor patch <<< "$current_version"
+
+          case "$VERSION_BUMP" in
+            "major")
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            "minor")
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            "patch")
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          new_version="${major}.${minor}.${patch}"
+          echo "New version: $new_version"
+
+          sed -i "s/otel_profiling_version=.*/otel_profiling_version=$new_version/" gradle.properties
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Get GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Create Release Branch and PR
+        run: |
+          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+          git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+
+          BRANCH="release/v${{ steps.bump_version.outputs.version }}"
+          git checkout -b "${BRANCH}"
+          git add gradle.properties
+          git commit -m "version ${{ steps.bump_version.outputs.version }}"
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --base main \
+            --head "${BRANCH}" \
+            --title "Release v${{ steps.bump_version.outputs.version }}" \
+            --body "Automated release PR for version ${{ steps.bump_version.outputs.version }}.
+
+          Once this PR is merged, the release-publish workflow will automatically:
+          - Build and publish artifacts to Maven Central
+          - Create the v${{ steps.bump_version.outputs.version }} tag
+          - Create a GitHub release"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
