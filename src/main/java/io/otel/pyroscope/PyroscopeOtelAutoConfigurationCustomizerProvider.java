@@ -1,6 +1,7 @@
 package io.otel.pyroscope;
 
 
+import io.opentelemetry.context.ContextStorage;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.pyroscope.javaagent.PyroscopeAgent;
@@ -14,7 +15,6 @@ import static io.otel.pyroscope.OtelCompat.getBoolean;
 
 public class PyroscopeOtelAutoConfigurationCustomizerProvider
         implements AutoConfigurationCustomizerProvider {
-
 
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
@@ -42,7 +42,10 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
                     .setRootSpanOnly(getBoolean(cfg, "otel.pyroscope.root.span.only", true))
                     .setAddSpanName(getBoolean(cfg, "otel.pyroscope.add.span.name", true))
+                    .setContextPropagationEnabled(getBoolean(cfg, "otel.pyroscope.context.propagation.enabled", true))
                     .build();
+
+            registerContextStorageWrapper(pyroOtelConfig);
 
             return tpBuilder.addSpanProcessor(
                     new PyroscopeOtelSpanProcessor(
@@ -77,5 +80,12 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     private static String getLabelsWrapperClassName() {
         // otherwise the relocate plugin renames this string :shrug:
         return new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmxhYmVscy52Mi5QeXJvc2NvcGUkTGFiZWxzV3JhcHBlcg=="));
+    }
+
+    private static void registerContextStorageWrapper(PyroscopeOtelConfiguration config) {
+        if (!config.contextPropagationEnabled) {
+            return;
+        }
+        ContextStorage.addWrapper(ProfilingContextStorage::new);
     }
 }
