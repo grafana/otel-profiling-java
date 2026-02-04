@@ -18,7 +18,7 @@ jobs:
         os: [ubuntu-x64-small, macos-latest]
         java: ['8', '11', '17', '21']
     steps:
-      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
       - name: Set up JDK
