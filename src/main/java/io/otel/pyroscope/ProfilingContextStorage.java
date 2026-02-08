@@ -12,11 +12,11 @@ import io.pyroscope.labels.v2.Pyroscope;
 import io.pyroscope.vendor.one.profiler.AsyncProfiler;
 
 /**
- * ContextStorage wrapper that synchronizes OTel context with async-profiler's
- * native pthread thread-local storage on every context switch.
+ * EXPERIMENTAL: This API is experimental and may change or be removed in future versions.
  *
- * This ensures profiling samples are correctly associated with spans,
- * even when work is executed on different threads via executors.
+ * Complements PyroscopeOtelSpanProcessor for wall-clock profiling. SpanProcessor handles
+ * span start/end on the originating thread, while this ContextStorage wrapper handles
+ * context propagation to other threads (e.g., via executors), keeping native TLS in sync.
  */
 public final class ProfilingContextStorage implements ContextStorage {
     private final ContextStorage delegate;
@@ -29,7 +29,6 @@ public final class ProfilingContextStorage implements ContextStorage {
 
     @Override
     public Scope attach(Context toAttach) {
-        // 1. Extract span ID and name from the context being attached
         long spanId = 0L;
         long spanNameId = 0L;
 
@@ -38,9 +37,8 @@ public final class ProfilingContextStorage implements ContextStorage {
             SpanContext spanContext = span.getSpanContext();
 
             if (spanContext.isValid()) {
-                spanId = parseHexSpanId(spanContext.getSpanId());
+                spanId = PyroscopeOtelSpanProcessor.parseSpanId(spanContext.getSpanId());
 
-                // Register span name to get an ID for native context
                 if (span instanceof ReadableSpan) {
                     String spanName = ((ReadableSpan) span).getName();
                     spanNameId = Pyroscope.LabelsWrapper.registerConstant(spanName);
@@ -48,15 +46,11 @@ public final class ProfilingContextStorage implements ContextStorage {
             }
         }
 
-        // 2. Set profiling context in native TLS (calls pthread_setspecific)
         if (asprof != null) {
             asprof.setTracingContext(spanId, spanNameId);
         }
 
-        // 3. Delegate to original storage (sets Java ThreadLocal)
         Scope originalScope = delegate.attach(toAttach);
-
-        // 4. Return wrapped scope that restores profiling context on close
         return new ProfilingScope(originalScope, delegate, asprof);
     }
 
@@ -65,25 +59,7 @@ public final class ProfilingContextStorage implements ContextStorage {
         return delegate.current();
     }
 
-    /**
-     * Parse 16-character hex span ID to long.
-     */
-    private static long parseHexSpanId(String hexSpanId) {
-        if (hexSpanId == null || hexSpanId.length() != 16) {
-            return 0L;
-        }
-        try {
-            return Long.parseUnsignedLong(hexSpanId, 16);
-        } catch (NumberFormatException e) {
-            return 0L;
-        }
-    }
-
-    /**
-     * Scope wrapper that restores profiling context when closed.
-     */
     private static final class ProfilingScope implements Scope {
-
         private final Scope delegate;
         private final ContextStorage storage;
         private final AsyncProfiler asprof;
@@ -96,10 +72,8 @@ public final class ProfilingContextStorage implements ContextStorage {
 
         @Override
         public void close() {
-            // 1. Close original scope (restores Java ThreadLocal)
             delegate.close();
 
-            // 2. Restore profiling context to match the now-current OTel context
             Context currentContext = storage.current();
             long spanId = 0L;
             long spanNameId = 0L;
@@ -108,7 +82,8 @@ public final class ProfilingContextStorage implements ContextStorage {
                 Span span = Span.fromContext(currentContext);
                 SpanContext spanContext = span.getSpanContext();
                 if (spanContext.isValid()) {
-                    spanId = parseHexSpanId(spanContext.getSpanId());
+                    spanId = PyroscopeOtelSpanProcessor.parseSpanId(spanContext.getSpanId());
+
                     if (span instanceof ReadableSpan) {
                         String spanName = ((ReadableSpan) span).getName();
                         spanNameId = Pyroscope.LabelsWrapper.registerConstant(spanName);
