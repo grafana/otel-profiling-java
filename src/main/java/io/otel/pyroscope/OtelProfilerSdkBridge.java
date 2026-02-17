@@ -9,20 +9,58 @@ import java.util.function.BiConsumer;
 
 public class OtelProfilerSdkBridge implements ProfilerApi {
 
-    private final Object sdkInstance;
-    private final Method registerConstant;
+    // Flag to enable/disable instrumentation capture
+    public static boolean appSdkEnabled = false;
 
+    private static Object sdkInstance;
+    private static Method registerConstant;
+    private static Method setTracingContextMethod;
+    private static Method startProfilingMethod;
+    private static Method isProfilingStartedMethod;
+    private static Method createScopedContextMethod;
 
     public OtelProfilerSdkBridge(Object sdkInstance, Method registerConstant) {
-        this.sdkInstance = sdkInstance;
-        this.registerConstant = registerConstant;
+        OtelProfilerSdkBridge.sdkInstance = sdkInstance;
+        OtelProfilerSdkBridge.registerConstant = registerConstant;
+        cacheMethods(sdkInstance);
+    }
+
+    /**
+     * Called by instrumentation when ProfilerSdk is constructed in App ClassLoader.
+     * Only sets the instance if appSdkEnabled is true.
+     */
+    public static void setSdkInstance(Object sdk) {
+        if (!appSdkEnabled) {
+            return;
+        }
+        sdkInstance = sdk;
+        cacheMethods(sdk);
+    }
+
+    private static void cacheMethods(Object sdk) {
+        try {
+            Class<?> sdkClass = sdk.getClass();
+            setTracingContextMethod = sdkClass.getDeclaredMethod("setTracingContext", long.class, long.class);
+            startProfilingMethod = sdkClass.getDeclaredMethod("startProfiling");
+            isProfilingStartedMethod = sdkClass.getDeclaredMethod("isProfilingStarted");
+            createScopedContextMethod = sdkClass.getDeclaredMethod("createScopedContext", Map.class);
+
+            Class<?> labelsClass = sdk.getClass().getClassLoader()
+                .loadClass("io.pyroscope.labels.v2.Pyroscope$LabelsWrapper");
+            registerConstant = labelsClass.getMethod("registerConstant", String.class);
+        } catch (Exception e) {
+            // Best effort
+        }
+    }
+
+    public static boolean isAvailable() {
+        return sdkInstance != null;
     }
 
     @Override
     public void startProfiling() {
         try {
-            Method method = sdkInstance.getClass().getDeclaredMethod("startProfiling");
-            method.invoke(sdkInstance);
+            startProfilingMethod.invoke(sdkInstance);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -31,8 +69,7 @@ public class OtelProfilerSdkBridge implements ProfilerApi {
     @Override
     public boolean isProfilingStarted() {
         try {
-            Method method = sdkInstance.getClass().getDeclaredMethod("isProfilingStarted");
-            return (boolean) method.invoke(sdkInstance);
+            return (boolean) isProfilingStartedMethod.invoke(sdkInstance);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -41,8 +78,7 @@ public class OtelProfilerSdkBridge implements ProfilerApi {
     @Override
     public ProfilerScopedContext createScopedContext(Map<String, String> labels) {
         try {
-            Method method = sdkInstance.getClass().getDeclaredMethod("createScopedContext", Map.class);
-            Object ctx = method.invoke(sdkInstance, labels);
+            Object ctx = createScopedContextMethod.invoke(sdkInstance, labels);
 
             return new ProfilerScopedContext() {
 
@@ -75,8 +111,7 @@ public class OtelProfilerSdkBridge implements ProfilerApi {
     @Override
     public void setTracingContext(long profileId, long spanName) {
         try {
-            Method method = sdkInstance.getClass().getDeclaredMethod("setTracingContext", long.class, long.class);
-            method.invoke(sdkInstance, profileId, spanName);
+            setTracingContextMethod.invoke(sdkInstance, profileId, spanName);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -42,7 +42,11 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
                     .setRootSpanOnly(getBoolean(cfg, "otel.pyroscope.root.span.only", true))
                     .setAddSpanName(getBoolean(cfg, "otel.pyroscope.add.span.name", true))
+                    .setAppSdkEnabled(getBoolean(cfg, "otel.pyroscope.app.sdk.enabled", false))
                     .build();
+
+            // Set the flag so instrumentation knows whether to capture SDK from App ClassLoader
+            OtelProfilerSdkBridge.appSdkEnabled = pyroOtelConfig.appSdkEnabled;
 
             return tpBuilder.addSpanProcessor(
                     new PyroscopeOtelSpanProcessor(
