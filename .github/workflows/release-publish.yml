@@ -32,7 +32,7 @@ jobs:
 
       - name: Get secrets
         if: steps.check.outputs.is_release == 'true'
-        uses: grafana/shared-workflows/actions/get-vault-secrets@5cfbfd5d1cedbc711fc9358744a6d46b37eb88ee
+        uses: grafana/shared-workflows/actions/get-vault-secrets@b75ffb1d75098846674c38e6d9b524cfc31e5f60
         with:
           repo_secrets: |
             NEXUS_USERNAME=publishing:nexus_username
