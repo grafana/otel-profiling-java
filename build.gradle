@@ -11,6 +11,7 @@ ext {
     versions = [
             opentelemetry              : "1.33.6",
             opentelemetryJavaagentAlpha: "1.33.6-alpha",
+            opentelemetrySdkAutoconfigure: "1.33.0",
     ]
 
     deps = [
@@ -43,9 +44,12 @@ repositories {
 dependencies {
     implementation("io.pyroscope:agent:$pyroscopeVersion")
 
+    compileOnly("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
+    compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:${versions.opentelemetrySdkAutoconfigure}")
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
+    compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-tooling:${versions.opentelemetryJavaagentAlpha}")
 
     testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
     testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
