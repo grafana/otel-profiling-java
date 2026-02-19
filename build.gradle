@@ -9,7 +9,7 @@ plugins {
 
 ext {
     versions = [
-            opentelemetry              : "1.33.6",
+            opentelemetry              : "2.25.0",
             opentelemetryJavaagentAlpha: "1.33.6-alpha",
     ]
 
