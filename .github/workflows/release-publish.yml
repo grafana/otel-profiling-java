@@ -101,7 +101,8 @@ jobs:
         if: steps.check.outputs.is_release == 'true'
         run: |
           gh release create "v${{ steps.check.outputs.version }}" \
-            build/libs/pyroscope-otel.jar \
+            agent-extension/build/libs/pyroscope-otel.jar \
+            lib/build/libs/pyroscope-otel-lib.jar \
             --title "Release v${{ steps.check.outputs.version }}" \
             --notes "Automated release"
         env:

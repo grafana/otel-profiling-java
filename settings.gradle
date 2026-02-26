@@ -1,0 +1,3 @@
+rootProject.name = 'otel-profiling-java'
+include 'agent-extension'
+include 'lib'
