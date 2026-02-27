@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '2.7.18'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+}
+
+group = 'io.pyroscope.example'
+version = '1.0-SNAPSHOT'
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // No Pyroscope or OpenTelemetry compile-time dependencies needed here.
+    // The OTel Java agent and pyroscope-otel extension are loaded at runtime via -javaagent flags.
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+}
+
+bootJar {
+    archiveFileName = 'app.jar'
+}

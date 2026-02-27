@@ -1,0 +1,63 @@
+# Prerequisites:
+#   1. Build the pyroscope-otel extension jar from the repository root:
+#      ./gradlew shadowJar
+#   2. Then from this directory:
+#      docker-compose up --build
+#
+# TODO: Once pyroscope-otel is published to Maven Central, step 1 will no longer
+#       be required. The Dockerfiles will reference the published artifact directly.
+
+services:
+  pyroscope:
+    image: grafana/pyroscope:latest
+    ports:
+      - "4040:4040"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - pyroscope
+
+  otel-extension-example:
+    build:
+      # Context is the repo root so Dockerfiles can access build/libs/pyroscope-otel.jar
+      context: ..
+      dockerfile: examples/with-otel-extension/Dockerfile
+    environment:
+      PYROSCOPE_SERVER_ADDRESS: http://pyroscope:4040
+      PYROSCOPE_APPLICATION_NAME: otel-extension-example
+      PYROSCOPE_FORMAT: jfr
+      OTEL_SERVICE_NAME: otel-extension-example
+      # Use the built-in logging exporter to print span names and IDs to stdout.
+      # This makes it easy to verify that the OTel agent is creating spans and that
+      # PyroscopeOtelSpanProcessor is receiving them.
+      OTEL_TRACES_EXPORTER: logging
+      # Disable logs and metrics exporters - no collector is running in this demo.
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pyroscope
+    restart: on-failure
+
+  otel-library-example:
+    build:
+      context: ..
+      dockerfile: examples/with-otel-library/Dockerfile
+    environment:
+      PYROSCOPE_SERVER_ADDRESS: http://pyroscope:4040
+      PYROSCOPE_APPLICATION_NAME: otel-library-example
+    ports:
+      - "8081:8080"
+    depends_on:
+      - pyroscope
+    restart: on-failure
