@@ -48,7 +48,7 @@ test {
 }
 
 shadowJar {
-    archiveFileName = "pyroscope-otel.jar"
+    archiveFileName = "pyroscope-otel-extension.jar"
     relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
         exclude 'io.pyroscope.javaagent.ProfilerSdk'
     }
