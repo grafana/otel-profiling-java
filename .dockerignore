@@ -9,6 +9,6 @@ Makefile
 !examples/
 # Allow the pre-built pyroscope-otel jars needed by example Dockerfiles
 !otel-extension/build/libs/
-!otel-extension/build/libs/pyroscope-otel.jar
+!otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
 !lib/build/libs/
-!lib/build/libs/pyroscope-otel-lib.jar
+!lib/build/libs/pyroscope-otel.jar

@@ -18,7 +18,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
     // Pyroscope Java agent used as a library to start profiling programmatically.
-    // The OTel extension (pyroscope-otel.jar) is loaded separately via -javaagent flags
+    // The OTel extension (pyroscope-otel-javaagent-extension.jar) is loaded separately via -javaagent flags
     // and discovers this running profiler via the system ClassLoader bridge.
     implementation 'io.pyroscope:agent:2.4.0'
 }

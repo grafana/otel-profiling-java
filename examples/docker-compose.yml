@@ -1,6 +1,6 @@
 # Prerequisites:
-#   1. Build the pyroscope-otel extension jar from the repository root:
-#      ./gradlew :otel-extension:shadowJar
+#   1. Build the pyroscope-otel jars from the repository root:
+#      ./gradlew :otel-extension:shadowJar :lib:jar
 #   2. Then from this directory:
 #      docker-compose up --build
 #
@@ -28,7 +28,7 @@ services:
 
   otel-extension-example:
     build:
-      # Context is the repo root so Dockerfiles can access build/libs/pyroscope-otel.jar
+      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
       context: ..
       dockerfile: examples/with-otel-extension/Dockerfile
     environment:
@@ -64,7 +64,7 @@ services:
 
   otel-extension-manual-start-example:
     build:
-      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel.jar
+      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
       context: ..
       dockerfile: examples/with-otel-extension-manual-start/Dockerfile
     environment:

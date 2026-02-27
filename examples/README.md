@@ -8,17 +8,17 @@ Each example runs a simple Spring Boot app that exposes a `/fibonacci?n=40` endp
 
 ### `with-otel-extension`
 
-Uses the **OpenTelemetry Java agent** with `pyroscope-otel.jar` loaded as an OTel extension:
+Uses the **OpenTelemetry Java agent** with `pyroscope-otel-javaagent-extension.jar` loaded as an OTel extension:
 
 - The app itself has **zero Pyroscope or OTel code** — it's plain Spring Boot
 - The OTel Java agent auto-instruments HTTP requests and creates spans automatically
-- The `pyroscope-otel.jar` extension registers itself via the OTel SPI, auto-starts the Pyroscope profiler, and wires `PyroscopeOtelSpanProcessor` to link profiling data to trace spans
+- The `pyroscope-otel-javaagent-extension.jar` extension registers itself via the OTel SPI, auto-starts the Pyroscope profiler, and wires `PyroscopeOtelSpanProcessor` to link profiling data to trace spans
 - Configured entirely via environment variables
 
 JVM startup looks like:
 ```
 java -javaagent:opentelemetry-javaagent.jar \
-     -Dotel.javaagent.extensions=pyroscope-otel.jar \
+     -Dotel.javaagent.extensions=pyroscope-otel-javaagent-extension.jar \
      -jar app.jar
 ```
 
@@ -38,18 +38,18 @@ java -jar app.jar
 
 ### `with-otel-extension-manual-start`
 
-Uses the **OpenTelemetry Java agent** with `pyroscope-otel.jar` as an OTel extension, but starts the Pyroscope profiler **programmatically from Java code**:
+Uses the **OpenTelemetry Java agent** with `pyroscope-otel-javaagent-extension.jar` as an OTel extension, but starts the Pyroscope profiler **programmatically from Java code**:
 
 - The app depends on `io.pyroscope:agent` as a compile-time library
 - `App.java` calls `PyroscopeAgent.start(...)` explicitly before Spring starts
 - The OTel Java agent auto-instruments HTTP requests and creates spans automatically
-- The `pyroscope-otel.jar` extension is loaded with `OTEL_PYROSCOPE_START_PROFILING=false` so it does **not** auto-start the profiler
+- The `pyroscope-otel-javaagent-extension.jar` extension is loaded with `OTEL_PYROSCOPE_START_PROFILING=false` so it does **not** auto-start the profiler
 - The extension discovers the already-running profiler via `OtelProfilerSdkBridge` (system ClassLoader reflection) and wires `PyroscopeOtelSpanProcessor` for trace-profile correlation
 
 JVM startup looks like:
 ```
 java -javaagent:opentelemetry-javaagent.jar \
-     -Dotel.javaagent.extensions=pyroscope-otel.jar \
+     -Dotel.javaagent.extensions=pyroscope-otel-javaagent-extension.jar \
      -jar app.jar
 ```
 
@@ -65,10 +65,11 @@ This pattern is useful when you need full control over `PyroscopeAgent` configur
 > **Note:** The `pyroscope-otel` jar is not yet published to Maven Central. You must build it locally first.
 > See the TODO comments in the Dockerfiles — once published, this step will not be required.
 
-**Step 1:** From the **repository root**, build the `pyroscope-otel` extension jar:
+**Step 1:** From the **repository root**, build both jars:
 ```bash
-./gradlew :otel-extension:shadowJar
+./gradlew :otel-extension:shadowJar :lib:jar
 ```
+This produces `otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar` and `lib/build/libs/pyroscope-otel.jar`.
 
 **Step 2:** From the **`examples/` directory**, start all containers:
 ```bash

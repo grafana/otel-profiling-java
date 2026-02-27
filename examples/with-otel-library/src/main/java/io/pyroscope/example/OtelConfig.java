@@ -35,7 +35,7 @@ public class OtelConfig {
                         .build()
         );
 
-        // Pass null for profilerSdk: the thin pyroscope-otel-lib.jar has no vendored dependencies,
+        // Pass null for profilerSdk: the thin pyroscope-otel.jar has no vendored dependencies,
         // so PyroscopeOtelSpanProcessor uses the io.pyroscope classes directly from the same
         // classloader as PyroscopeAgent above - no bridge needed.
         PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor(

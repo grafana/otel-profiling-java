@@ -43,8 +43,8 @@ jobs:
 
       # Build both jars first - required by the example Dockerfiles.
       # TODO: Remove this step once pyroscope-otel is published to Maven Central.
-      # - otel-extension/build/libs/pyroscope-otel.jar      (shadow jar) used by the otel-extension and otel-extension-manual-start examples
-      # - lib/build/libs/pyroscope-otel-lib.jar             (thin jar)   used by the otel-library example
+      # - otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar  (shadow jar) used by the otel-extension and otel-extension-manual-start examples
+      # - lib/build/libs/pyroscope-otel.jar                 (thin jar)   used by the otel-library example
       - name: Build pyroscope-otel jars
         run: ./gradlew :otel-extension:shadowJar :lib:jar --no-daemon
 
