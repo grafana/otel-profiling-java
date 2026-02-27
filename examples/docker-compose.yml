@@ -1,6 +1,6 @@
 # Prerequisites:
 #   1. Build the pyroscope-otel extension jar from the repository root:
-#      ./gradlew shadowJar
+#      ./gradlew :otel-extension:shadowJar
 #   2. Then from this directory:
 #      docker-compose up --build
 #
@@ -58,6 +58,29 @@ services:
       PYROSCOPE_APPLICATION_NAME: otel-library-example
     ports:
       - "8081:8080"
+    depends_on:
+      - pyroscope
+    restart: on-failure
+
+  otel-extension-manual-start-example:
+    build:
+      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel.jar
+      context: ..
+      dockerfile: examples/with-otel-extension-manual-start/Dockerfile
+    environment:
+      PYROSCOPE_SERVER_ADDRESS: http://pyroscope:4040
+      PYROSCOPE_APPLICATION_NAME: otel-extension-manual-start-example
+      OTEL_SERVICE_NAME: otel-extension-manual-start-example
+      # Tell the pyroscope-otel extension NOT to start the profiler automatically.
+      # The app starts PyroscopeAgent programmatically in App.java instead.
+      OTEL_PYROSCOPE_START_PROFILING: "false"
+      # Use the built-in logging exporter to print span names and IDs to stdout.
+      OTEL_TRACES_EXPORTER: logging
+      # Disable logs and metrics exporters - no collector is running in this demo.
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    ports:
+      - "8082:8080"
     depends_on:
       - pyroscope
     restart: on-failure
