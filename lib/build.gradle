@@ -51,7 +51,7 @@ java {
 }
 
 jar {
-    archiveFileName = "pyroscope-otel-lib.jar"
+    archiveFileName = "pyroscope-otel.jar"
 }
 
 publishing {
@@ -59,11 +59,11 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
             groupId = 'io.pyroscope'
-            artifactId = 'otel-lib'
+            artifactId = 'otel'
             version = project.version
             pom {
-                name = 'Pyroscope OTEL integration library'
-                description = 'Pyroscope OTEL integration - library (requires external pyroscope agent)'
+                name = 'Pyroscope OTEL integration'
+                description = 'Pyroscope OTEL integration'
                 url = 'https://pyroscope.io'
                 licenses {
                     license {

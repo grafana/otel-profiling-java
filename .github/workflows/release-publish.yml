@@ -102,7 +102,7 @@ jobs:
         run: |
           gh release create "v${{ steps.check.outputs.version }}" \
             otel-extension/build/libs/pyroscope-otel.jar \
-            lib/build/libs/pyroscope-otel-lib.jar \
+            lib/build/libs/pyroscope-otel.jar \
             --title "Release v${{ steps.check.outputs.version }}" \
             --notes "Automated release"
         env:

@@ -11,4 +11,4 @@ Makefile
 !otel-extension/build/libs/
 !otel-extension/build/libs/pyroscope-otel.jar
 !lib/build/libs/
-!lib/build/libs/pyroscope-otel-lib.jar
+!lib/build/libs/pyroscope-otel.jar

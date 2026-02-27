@@ -27,11 +27,11 @@ dependencies {
     implementation "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.44.1"
 
     // TODO: Once pyroscope-otel (this project) is published to Maven Central, replace this with:
-    //       implementation 'io.pyroscope:otel-lib:1.1.0'
+    //       implementation 'io.pyroscope:otel:1.1.0'
     // For now, reference the locally-built thin jar (built via `./gradlew :lib:jar` from repo root).
     // We use the thin jar (no vendored dependencies) so that io.pyroscope:agent above is the
     // single copy of all pyroscope classes on the classpath - no shaded duplicates.
-    implementation fileTree(dir: 'libs', include: ['pyroscope-otel-lib.jar'])
+    implementation fileTree(dir: 'libs', include: ['pyroscope-otel.jar'])
 }
 
 bootJar {
