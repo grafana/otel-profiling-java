@@ -7,6 +7,8 @@ import io.pyroscope.javaagent.PyroscopeAgent;
 import io.pyroscope.javaagent.config.Config;
 
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Base64;
 
 import static io.otel.pyroscope.OtelCompat.getBoolean;
@@ -25,9 +27,17 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             } catch (Exception e) {
                 // This usually means we are running without the Pyroscope SDK.
                 // We'll instead use the Profiler bundled with the extension.
-                // todo do not print or at least silence this by default
                 System.out.println("Could not load the profiler SDK, will continue with the built-in one!");
-                //e.printStackTrace();
+                System.out.println("  Reason: " + e.getMessage());
+                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+                if (systemClassLoader instanceof URLClassLoader) {
+                    System.out.println("  JARs visible to system classloader:");
+                    for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
+                        System.out.println("    " + url);
+                    }
+                } else {
+                    System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
+                }
             }
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);

@@ -7,12 +7,12 @@ FROM gradle:8.14.3-jdk17 AS builder
 WORKDIR /build
 
 # Copy build descriptor files and resolve dependencies first (improves layer caching)
-COPY examples/with-otel-extension/build.gradle ./build.gradle
-COPY examples/with-otel-extension/settings.gradle ./settings.gradle
+COPY examples/with-otel-extension-manual-start/build.gradle ./build.gradle
+COPY examples/with-otel-extension-manual-start/settings.gradle ./settings.gradle
 RUN gradle dependencies --no-daemon -q
 
 # Copy source and build the fat jar
-COPY examples/with-otel-extension/src ./src
+COPY examples/with-otel-extension-manual-start/src ./src
 RUN gradle bootJar --no-daemon -q
 
 
@@ -40,9 +40,15 @@ EXPOSE 8080
 # The pyroscope-otel extension registers PyroscopeOtelSpanProcessor which links
 # profiling data to trace spans via the span ID.
 #
-# Configuration is done entirely via environment variables - see docker-compose.yml:
-#   PYROSCOPE_SERVER_ADDRESS, PYROSCOPE_APPLICATION_NAME, PYROSCOPE_FORMAT
-#   OTEL_SERVICE_NAME, OTEL_TRACES_EXPORTER
+# OTEL_PYROSCOPE_START_PROFILING=false tells the extension NOT to start the
+# Pyroscope profiler automatically - the app starts it programmatically instead
+# (see App.java). This allows full control over profiling configuration.
+#
+# The extension still discovers the running profiler via the system ClassLoader
+# (OtelProfilerSdkBridge) and wires PyroscopeOtelSpanProcessor for trace-profile
+# correlation.
+#
+# Configuration is done entirely via environment variables - see docker-compose.yml.
 CMD ["java", \
      "-javaagent:opentelemetry-javaagent.jar", \
      "-Dotel.javaagent.extensions=pyroscope-otel.jar", \

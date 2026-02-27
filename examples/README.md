@@ -1,8 +1,8 @@
 # otel-profiling-java Examples
 
-These examples demonstrate two ways to integrate Pyroscope profiling with OpenTelemetry in a Java application.
+These examples demonstrate different ways to integrate Pyroscope profiling with OpenTelemetry in a Java application.
 
-Both examples run a simple Spring Boot app that exposes a `/fibonacci?n=40` endpoint performing intentionally CPU-intensive recursive work, making profiling data easy to observe.
+Each example runs a simple Spring Boot app that exposes a `/fibonacci?n=40` endpoint performing intentionally CPU-intensive recursive work, making profiling data easy to observe.
 
 ## Examples
 
@@ -36,6 +36,25 @@ JVM startup looks like:
 java -jar app.jar
 ```
 
+### `with-otel-extension-manual-start`
+
+Uses the **OpenTelemetry Java agent** with `pyroscope-otel.jar` as an OTel extension, but starts the Pyroscope profiler **programmatically from Java code**:
+
+- The app depends on `io.pyroscope:agent` as a compile-time library
+- `App.java` calls `PyroscopeAgent.start(...)` explicitly before Spring starts
+- The OTel Java agent auto-instruments HTTP requests and creates spans automatically
+- The `pyroscope-otel.jar` extension is loaded with `OTEL_PYROSCOPE_START_PROFILING=false` so it does **not** auto-start the profiler
+- The extension discovers the already-running profiler via `OtelProfilerSdkBridge` (system ClassLoader reflection) and wires `PyroscopeOtelSpanProcessor` for trace-profile correlation
+
+JVM startup looks like:
+```
+java -javaagent:opentelemetry-javaagent.jar \
+     -Dotel.javaagent.extensions=pyroscope-otel.jar \
+     -jar app.jar
+```
+
+This pattern is useful when you need full control over `PyroscopeAgent` configuration (custom labels, events, upload intervals, etc.) while still benefiting from OTel auto-instrumentation and automatic trace-profile linking.
+
 ## Prerequisites
 
 - Docker and Docker Compose
@@ -48,9 +67,8 @@ java -jar app.jar
 
 **Step 1:** From the **repository root**, build the `pyroscope-otel` extension jar:
 ```bash
-./gradlew shadowJar
+./gradlew :otel-extension:shadowJar
 ```
-This produces `build/libs/pyroscope-otel.jar`.
 
 **Step 2:** From the **`examples/` directory**, start all containers:
 ```bash
@@ -59,19 +77,17 @@ docker-compose up --build
 
 This starts:
 - **Pyroscope** at `http://localhost:4040`
+- **Grafana** at `http://localhost:3000`
 - **otel-extension-example** at `http://localhost:8080`
 - **otel-library-example** at `http://localhost:8081`
+- **otel-extension-manual-start-example** at `http://localhost:8082`
 
 **Step 3:** Generate some load to produce profiling data:
 ```bash
-# Extension example
-curl "http://localhost:8080/fibonacci?n=40"
-
-# Library example
-curl "http://localhost:8081/fibonacci?n=40"
+./loadgen.sh
 ```
 
-**Step 4:** Open the Pyroscope UI at `http://localhost:4040` and select the application (`otel-extension-example` or `otel-library-example`) to view CPU flamegraphs.
+**Step 4:** Open the Pyroscope UI at `http://localhost:4040` and select an application to view CPU flamegraphs.
 
 ## Configuration
 
@@ -79,8 +95,9 @@ curl "http://localhost:8081/fibonacci?n=40"
 |---|---|---|
 | `PYROSCOPE_SERVER_ADDRESS` | `http://localhost:4040` | Pyroscope server URL |
 | `PYROSCOPE_APPLICATION_NAME` | example-specific | Application name shown in Pyroscope UI |
-| `PYROSCOPE_FORMAT` | `jfr` | Profiling data format (extension example only) |
-| `OTEL_SERVICE_NAME` | example-specific | Service name in OTel (extension example only) |
-| `OTEL_TRACES_EXPORTER` | `none` | No traces backend needed for this demo (extension example only) |
+| `PYROSCOPE_FORMAT` | `jfr` | Profiling data format (extension examples only) |
+| `OTEL_SERVICE_NAME` | example-specific | Service name in OTel (extension examples only) |
+| `OTEL_PYROSCOPE_START_PROFILING` | `true` | Set to `false` to prevent the extension from auto-starting the profiler |
+| `OTEL_TRACES_EXPORTER` | `logging` | Traces exporter (logging prints to stdout) |
 
 For more information, see the [Grafana Pyroscope Java span profiles documentation](https://grafana.com/docs/pyroscope/latest/configure-client/trace-span-profiles/java-span-profiles/).
