@@ -1,5 +1,5 @@
 # Build context: repository root (set in docker-compose.yml via `context: ..`)
-# This allows copying build/libs/pyroscope-otel.jar built from the repo root.
+# This allows copying otel-extension/build/libs/pyroscope-otel.jar built from the repo root.
 
 # Stage 1: Build the example application
 FROM eclipse-temurin:17-jdk AS builder
@@ -32,11 +32,11 @@ ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/release
 
 # TODO: This is temporary. Once pyroscope-otel is published to Maven Central,
 #       replace this COPY with an ADD from the release URL, for example:
-#       ADD https://github.com/grafana/otel-profiling-java/releases/download/v1.0.4/pyroscope-otel.jar pyroscope-otel.jar
+#       ADD https://github.com/grafana/otel-profiling-java/releases/download/v1.1.0/pyroscope-otel.jar pyroscope-otel.jar
 #
 # For now, build the jar first from the repository root:
-#   ./gradlew shadowJar
-COPY build/libs/pyroscope-otel.jar pyroscope-otel.jar
+#   ./gradlew :otel-extension:shadowJar
+COPY otel-extension/build/libs/pyroscope-otel.jar pyroscope-otel.jar
 
 EXPOSE 8080
 

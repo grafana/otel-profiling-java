@@ -6,6 +6,8 @@ on:
     paths:
       - 'examples/**'
       - 'src/**'
+      - 'otel-extension/**'
+      - 'lib/**'
       - 'build.gradle'
       - 'gradle.properties'
       - 'settings.gradle'
@@ -15,6 +17,8 @@ on:
     paths:
       - 'examples/**'
       - 'src/**'
+      - 'otel-extension/**'
+      - 'lib/**'
       - 'build.gradle'
       - 'gradle.properties'
       - 'settings.gradle'
@@ -39,10 +43,10 @@ jobs:
 
       # Build both jars first - required by the example Dockerfiles.
       # TODO: Remove this step once pyroscope-otel is published to Maven Central.
-      # - pyroscope-otel.jar      (shadow jar) used by the otel-extension example
-      # - pyroscope-otel-lib.jar  (thin jar)   used by the otel-library example
+      # - otel-extension/build/libs/pyroscope-otel.jar      (shadow jar) used by the otel-extension example
+      # - lib/build/libs/pyroscope-otel-lib.jar             (thin jar)   used by the otel-library example
       - name: Build pyroscope-otel jars
-        run: ./gradlew jar shadowJar --no-daemon
+        run: ./gradlew :otel-extension:shadowJar :lib:jar --no-daemon
 
       - name: Build otel-extension example Docker image
         run: |

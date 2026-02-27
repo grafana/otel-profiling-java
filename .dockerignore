@@ -7,6 +7,8 @@ gradlew.bat
 Makefile
 *.md
 !examples/
-# Allow the pre-built pyroscope-otel jar needed by example Dockerfiles
-!build/libs/
-!build/libs/pyroscope-otel.jar
+# Allow the pre-built pyroscope-otel jars needed by example Dockerfiles
+!otel-extension/build/libs/
+!otel-extension/build/libs/pyroscope-otel.jar
+!lib/build/libs/
+!lib/build/libs/pyroscope-otel-lib.jar
