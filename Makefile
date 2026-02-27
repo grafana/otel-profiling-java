@@ -1,13 +1,13 @@
-.PHONY: clean build build-agent-extension build-lib publish test
+.PHONY: clean build build-otel-extension build-lib publish test
 
 clean:
 	./gradlew clean
 
 build:
-	./gradlew :agent-extension:shadowJar :lib:jar
+	./gradlew :otel-extension:shadowJar :lib:jar
 
-build-agent-extension:
-	./gradlew :agent-extension:shadowJar
+build-otel-extension:
+	./gradlew :otel-extension:shadowJar
 
 build-lib:
 	./gradlew :lib:jar
