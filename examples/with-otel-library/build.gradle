@@ -28,8 +28,10 @@ dependencies {
 
     // TODO: Once pyroscope-otel (this project) is published to Maven Central, replace this with:
     //       implementation 'io.pyroscope:otel:1.0.4'
-    // For now, reference the locally-built shadow jar (built via `./gradlew shadowJar` from repo root).
-    implementation fileTree(dir: 'libs', include: ['pyroscope-otel.jar'])
+    // For now, reference the locally-built thin jar (built via `./gradlew jar` from repo root).
+    // We use the thin jar (no vendored dependencies) so that io.pyroscope:agent above is the
+    // single copy of all pyroscope classes on the classpath - no shaded duplicates.
+    implementation fileTree(dir: 'libs', include: ['pyroscope-otel-lib.jar'])
 }
 
 bootJar {

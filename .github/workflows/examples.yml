@@ -37,10 +37,12 @@ jobs:
           java-version: '17'
           distribution: 'zulu'
 
-      # Build pyroscope-otel.jar first - required by both example Dockerfiles.
+      # Build both jars first - required by the example Dockerfiles.
       # TODO: Remove this step once pyroscope-otel is published to Maven Central.
-      - name: Build pyroscope-otel.jar
-        run: ./gradlew shadowJar --no-daemon
+      # - pyroscope-otel.jar      (shadow jar) used by the otel-extension example
+      # - pyroscope-otel-lib.jar  (thin jar)   used by the otel-library example
+      - name: Build pyroscope-otel jars
+        run: ./gradlew jar shadowJar --no-daemon
 
       - name: Build otel-extension example Docker image
         run: |

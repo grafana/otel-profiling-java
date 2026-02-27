@@ -1,5 +1,5 @@
 # Build context: repository root (set in docker-compose.yml via `context: ..`)
-# This allows copying build/libs/pyroscope-otel.jar built from the repo root.
+# This allows copying build/libs/pyroscope-otel-lib.jar built from the repo root.
 
 # Stage 1: Build the example application
 FROM eclipse-temurin:17-jdk AS builder
@@ -18,9 +18,14 @@ COPY examples/with-otel-library/settings.gradle ./settings.gradle
 #       remove this COPY and replace the fileTree dependency in build.gradle with:
 #       implementation 'io.pyroscope:otel:1.0.4'
 #
-# For now, build the jar first from the repository root:
-#   ./gradlew shadowJar
-COPY build/libs/pyroscope-otel.jar ./libs/pyroscope-otel.jar
+# We use the thin jar (pyroscope-otel-lib.jar) here - it contains only the
+# io.otel.pyroscope.* integration classes with no vendored dependencies.
+# io.pyroscope:agent is declared separately in build.gradle so there is only
+# one copy of the pyroscope classes on the classpath.
+#
+# Build both jars from the repository root:
+#   ./gradlew jar shadowJar
+COPY build/libs/pyroscope-otel-lib.jar ./libs/pyroscope-otel-lib.jar
 
 RUN ./gradlew dependencies --no-daemon -q
 
