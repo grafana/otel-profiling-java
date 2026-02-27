@@ -1,5 +1,6 @@
 package io.pyroscope.example;
 
+import io.opentelemetry.api.trace.Span;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,8 +21,9 @@ public class WorkController {
      */
     @GetMapping("/fibonacci")
     public String fibonacci(@RequestParam(defaultValue = "40") int n) {
+        String spanId = Span.current().getSpanContext().getSpanId();
         long result = fibonacciService.compute(n);
-        return "fibonacci(" + n + ") = " + result;
+        return "fibonacci(" + n + ") = " + result + " spanId=" + spanId;
     }
 
     @GetMapping("/health")

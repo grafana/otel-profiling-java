@@ -29,7 +29,7 @@ public class WorkController {
         Span span = tracer.spanBuilder("fibonacci").startSpan();
         try (Scope ignored = span.makeCurrent()) {
             long result = fibonacciService.compute(n);
-            return "fibonacci(" + n + ") = " + result;
+            return "fibonacci(" + n + ") = " + result + " spanId=" + span.getSpanContext().getSpanId();
         } finally {
             span.end();
         }
