@@ -1,5 +1,5 @@
 # Build context: repository root (set in docker-compose.yml via `context: ..`)
-# This allows copying otel-extension/build/libs/pyroscope-otel.jar built from the repo root.
+# This allows copying otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar built from the repo root.
 
 # Stage 1: Build the example application
 # Use the official Gradle image so no Gradle distribution download is needed at build time.
@@ -28,11 +28,11 @@ ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/release
 
 # TODO: This is temporary. Once pyroscope-otel is published to Maven Central,
 #       replace this COPY with an ADD from the release URL, for example:
-#       ADD https://github.com/grafana/otel-profiling-java/releases/download/v1.1.0/pyroscope-otel.jar pyroscope-otel.jar
+#       ADD https://github.com/grafana/otel-profiling-java/releases/download/v1.1.0/pyroscope-otel-javaagent-extension.jar pyroscope-otel-javaagent-extension.jar
 #
 # For now, build the jar first from the repository root:
 #   ./gradlew :otel-extension:shadowJar
-COPY otel-extension/build/libs/pyroscope-otel.jar pyroscope-otel.jar
+COPY otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar pyroscope-otel-javaagent-extension.jar
 
 EXPOSE 8080
 
@@ -51,5 +51,5 @@ EXPOSE 8080
 # Configuration is done entirely via environment variables - see docker-compose.yml.
 CMD ["java", \
      "-javaagent:opentelemetry-javaagent.jar", \
-     "-Dotel.javaagent.extensions=pyroscope-otel.jar", \
+     "-Dotel.javaagent.extensions=pyroscope-otel-javaagent-extension.jar", \
      "-jar", "app.jar"]

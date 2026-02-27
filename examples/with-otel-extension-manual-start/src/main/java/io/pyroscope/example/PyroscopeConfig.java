@@ -22,7 +22,7 @@ public class PyroscopeConfig {
     public void init() {
         // Start Pyroscope profiling programmatically.
         //
-        // The pyroscope-otel extension (loaded via -Dotel.javaagent.extensions=pyroscope-otel.jar)
+        // The pyroscope-otel extension (loaded via -Dotel.javaagent.extensions=pyroscope-otel-javaagent-extension.jar)
         // is configured with OTEL_PYROSCOPE_START_PROFILING=false so it does NOT auto-start
         // the profiler. Instead, it detects this running PyroscopeAgent via the system
         // ClassLoader bridge (OtelProfilerSdkBridge) and wires PyroscopeOtelSpanProcessor
