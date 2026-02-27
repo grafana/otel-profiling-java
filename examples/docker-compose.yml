@@ -13,6 +13,19 @@ services:
     ports:
       - "4040:4040"
 
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - pyroscope
+
   otel-extension-example:
     build:
       # Context is the repo root so Dockerfiles can access build/libs/pyroscope-otel.jar
@@ -23,8 +36,10 @@ services:
       PYROSCOPE_APPLICATION_NAME: otel-extension-example
       PYROSCOPE_FORMAT: jfr
       OTEL_SERVICE_NAME: otel-extension-example
-      # No traces backend needed for this demo - focus is on profiling
-      OTEL_TRACES_EXPORTER: none
+      # Use the built-in logging exporter to print span names and IDs to stdout.
+      # This makes it easy to verify that the OTel agent is creating spans and that
+      # PyroscopeOtelSpanProcessor is receiving them.
+      OTEL_TRACES_EXPORTER: logging
     ports:
       - "8080:8080"
     depends_on:
