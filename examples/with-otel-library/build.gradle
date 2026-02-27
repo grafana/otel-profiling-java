@@ -1,0 +1,39 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '2.7.18'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+}
+
+group = 'io.pyroscope.example'
+version = '1.0-SNAPSHOT'
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Pyroscope Java agent used as a library (not as a -javaagent) to start profiling programmatically.
+    // TODO: io.pyroscope:agent is not yet published to Maven Central. Once published,
+    //       confirm the version matches gradle.properties in the repo root (currently 2.4.0).
+    implementation 'io.pyroscope:agent:2.4.0'
+
+    // OpenTelemetry SDK for manual tracer/span creation
+    implementation "io.opentelemetry:opentelemetry-sdk:1.44.1"
+    implementation "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.44.1"
+
+    // TODO: Once pyroscope-otel (this project) is published to Maven Central, replace this with:
+    //       implementation 'io.pyroscope:otel-lib:1.1.0'
+    // For now, reference the locally-built thin jar (built via `./gradlew :lib:jar` from repo root).
+    // We use the thin jar (no vendored dependencies) so that io.pyroscope:agent above is the
+    // single copy of all pyroscope classes on the classpath - no shaded duplicates.
+    implementation fileTree(dir: 'libs', include: ['pyroscope-otel-lib.jar'])
+}
+
+bootJar {
+    archiveFileName = 'app.jar'
+}
