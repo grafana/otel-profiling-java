@@ -1,0 +1,12 @@
+.git
+src
+.github
+gradle
+gradlew
+gradlew.bat
+Makefile
+*.md
+!examples/
+# Allow the pre-built pyroscope-otel jar needed by example Dockerfiles
+!build/libs/
+!build/libs/pyroscope-otel.jar
