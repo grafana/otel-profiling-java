@@ -2,13 +2,9 @@
 # This allows copying lib/build/libs/pyroscope-otel-lib.jar built from the repo root.
 
 # Stage 1: Build the example application
-FROM eclipse-temurin:17-jdk AS builder
+# Use the official Gradle image so no Gradle distribution download is needed at build time.
+FROM gradle:8.14.3-jdk17 AS builder
 WORKDIR /build
-
-# Copy Gradle wrapper from this example directory
-COPY examples/with-otel-library/gradlew ./gradlew
-COPY examples/with-otel-library/gradle ./gradle
-RUN chmod +x ./gradlew
 
 # Copy build descriptor files and resolve dependencies first (improves layer caching)
 COPY examples/with-otel-library/build.gradle ./build.gradle
@@ -27,11 +23,11 @@ COPY examples/with-otel-library/settings.gradle ./settings.gradle
 #   ./gradlew :lib:jar
 COPY lib/build/libs/pyroscope-otel-lib.jar ./libs/pyroscope-otel-lib.jar
 
-RUN ./gradlew dependencies --no-daemon -q
+RUN gradle dependencies --no-daemon -q
 
 # Copy source and build the fat jar
 COPY examples/with-otel-library/src ./src
-RUN ./gradlew bootJar --no-daemon -q
+RUN gradle bootJar --no-daemon -q
 
 
 # Stage 2: Runtime image
