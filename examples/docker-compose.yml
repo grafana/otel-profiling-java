@@ -40,6 +40,9 @@ services:
       # This makes it easy to verify that the OTel agent is creating spans and that
       # PyroscopeOtelSpanProcessor is receiving them.
       OTEL_TRACES_EXPORTER: logging
+      # Disable logs and metrics exporters - no collector is running in this demo.
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
     ports:
       - "8080:8080"
     depends_on:
