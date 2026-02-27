@@ -1,0 +1,102 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ["${rootProject.projectDir}/src/main/java"]
+        }
+        resources {
+            srcDirs = ["${rootProject.projectDir}/src/main/resources"]
+        }
+    }
+    test {
+        java {
+            srcDirs = ["${rootProject.projectDir}/src/test/java"]
+        }
+    }
+}
+
+dependencies {
+    // Not vendored - declared as regular dependency, appears in the POM
+    implementation("io.pyroscope:agent:${pyroscopeVersion}")
+
+    compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
+    compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
+    compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
+
+    testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
+    testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
+    testImplementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
+    testImplementation("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
+
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.7.2'
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.7.2'
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.12.4'
+    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '3.12.4'
+}
+
+// Tests run only in agent-extension since source is identical
+test.enabled = false
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+jar {
+    archiveFileName = "pyroscope-otel-lib.jar"
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = 'io.pyroscope'
+            artifactId = 'otel-lib'
+            version = project.version
+            pom {
+                name = 'Pyroscope OTEL integration library'
+                description = 'Pyroscope OTEL integration - library (requires external pyroscope agent)'
+                url = 'https://pyroscope.io'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pyroscope'
+                        name = 'Pyroscope'
+                        email = 'anatoly@pyroscope.io'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/pyroscope-io/pyroscope-java.git'
+                    developerConnection = 'scm:git:ssh://github.com/pyroscope-io/pyroscope-java.git'
+                    url = 'https://github.com/pyroscope-io/pyroscope-java'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            credentials {
+                username project.hasProperty('nexusUsername') ? project.nexusUsername : ''
+                password project.hasProperty('nexusPassword') ? project.nexusPassword : ''
+            }
+            url "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}

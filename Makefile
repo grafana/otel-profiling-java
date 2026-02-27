@@ -1,12 +1,17 @@
-.PHONY: clean
+.PHONY: clean build build-otel-extension build-lib publish test
+
 clean:
 	./gradlew clean
 
-.PHONY: build
 build:
-	./gradlew shadowJar
+	./gradlew :otel-extension:shadowJar :lib:jar
 
-.PHONY: publish
+build-otel-extension:
+	./gradlew :otel-extension:shadowJar
+
+build-lib:
+	./gradlew :lib:jar
+
 publish:
 	@echo "./gradlew clean assemble publishToSonatype closeAndReleaseSonatypeStagingRepository"
 	@./gradlew clean assemble publishToSonatype closeAndReleaseSonatypeStagingRepository \
@@ -15,9 +20,6 @@ publish:
 		-Psigning.secretKeyRingFile="$(NEXUS_GPG_SECRING_FILE)" \
 		-Psigning.password="$(NEXUS_GPG_PASSWORD)" \
 		-Psigning.keyId="$(NEXUS_GPG_KEY_ID)" --stacktrace
-	
 
-.PHONY: test
 test:
 	./gradlew test
-
