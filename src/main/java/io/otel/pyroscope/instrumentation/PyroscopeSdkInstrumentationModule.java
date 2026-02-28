@@ -3,6 +3,7 @@ package io.otel.pyroscope.instrumentation;
 import io.opentelemetry.javaagent.extension.instrumentation.InstrumentationModule;
 import io.opentelemetry.javaagent.extension.instrumentation.TypeInstrumentation;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -21,9 +22,15 @@ public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
     @Override
     public List<String> getAdditionalHelperClassNames() {
-        // Inject ProfilerApi into the instrumented classloader so that ProfilerSdk
-        // (which implements ProfilerApi) can be cast to it without reflection.
-        return Collections.singletonList("io.pyroscope.agent.api.ProfilerApi");
+        return Arrays.asList(
+            "io.pyroscope.agent.api.ProfilerApi",
+            "io.pyroscope.agent.api.ProfilerApi$Holder",
+            // The advice class and its enclosing class must be injected because ByteBuddy
+            // inlines the advice code but the JVM still needs to resolve static field
+            // references on the advice class.
+            "io.otel.pyroscope.instrumentation.ProfilerSdkInstrumentation",
+            "io.otel.pyroscope.instrumentation.ProfilerSdkInstrumentation$StartAdvice"
+        );
     }
 
     @Override
