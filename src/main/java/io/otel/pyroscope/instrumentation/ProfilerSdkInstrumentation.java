@@ -6,8 +6,6 @@ import net.bytebuddy.asm.Advice;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.matcher.ElementMatcher;
 
-import java.util.Base64;
-
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
 /**
@@ -15,19 +13,21 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
  * a ProfilerSdk instance from the same classloader that loaded PyroscopeAgent
  * (e.g. Spring Boot's custom classloader) and register it as the active profiler.
  *
- * NOTE: Class name strings are Base64-encoded to prevent the shadow jar relocator
- * from renaming them. The relocator matches string constants like "io.pyroscope.*"
- * and would change them to "io.otel.pyroscope.shadow.*", breaking type matchers.
+ * NOTE: Class name strings are constructed via String.format to prevent the shadow
+ * jar relocator from matching and renaming them. The relocator matches string
+ * constants like "io.pyroscope.*" and would change them to
+ * "io.otel.pyroscope.shadow.*", breaking type matchers.
  */
 public class ProfilerSdkInstrumentation implements TypeInstrumentation {
 
-    // Base64 of "io.pyroscope.javaagent.PyroscopeAgent"
-    private static final String PYROSCOPE_AGENT_CLASS =
-        new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmphdmFhZ2VudC5QeXJvc2NvcGVBZ2VudA=="));
+    // Constructed at runtime to avoid shadow jar relocation of "io.pyroscope" prefix.
+    private static final String PYROSCOPE_PKG = String.join(".", "io", "pyroscope", "javaagent");
 
-    // Base64 of "io.pyroscope.javaagent.ProfilerSdk"
-    private static final String PROFILER_SDK_CLASS =
-        new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmphdmFhZ2VudC5Qcm9maWxlclNkaw=="));
+    // io.pyroscope.javaagent.PyroscopeAgent
+    private static final String PYROSCOPE_AGENT_CLASS = PYROSCOPE_PKG + ".PyroscopeAgent";
+
+    // io.pyroscope.javaagent.ProfilerSdk
+    private static final String PROFILER_SDK_CLASS = PYROSCOPE_PKG + ".ProfilerSdk";
 
     @Override
     public ElementMatcher<TypeDescription> typeMatcher() {
@@ -53,10 +53,9 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
                 System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader: " + cl);
                 System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader class: " + cl.getClass().getName());
 
-                // Base64 decode inline to avoid shadow jar string relocation
-                // Decodes to: io.pyroscope.javaagent.ProfilerSdk
-                String sdkClassName = new String(
-                    Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmphdmFhZ2VudC5Qcm9maWxlclNkaw=="));
+                // Constructed at runtime to avoid shadow jar string relocation
+                // io.pyroscope.javaagent.ProfilerSdk
+                String sdkClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
 
                 // Load and instantiate ProfilerSdk from the app classloader
                 Class<?> sdkClass = cl.loadClass(sdkClassName);

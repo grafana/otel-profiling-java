@@ -8,7 +8,6 @@ import io.pyroscope.agent.api.ProfilerApi;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.Base64;
 
 import static io.otel.pyroscope.OtelCompat.getBoolean;
 
@@ -74,8 +73,7 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     }
 
     private static String getProfilerSdkClassName() {
-        // otherwise the relocate plugin renames this string :shrug:
-        // decodes to: io.pyroscope.javaagent.ProfilerSdk
-        return new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmphdmFhZ2VudC5Qcm9maWxlclNkaw=="));
+        // Constructed at runtime so the shadow jar relocator doesn't rename it
+        return String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
     }
 }
