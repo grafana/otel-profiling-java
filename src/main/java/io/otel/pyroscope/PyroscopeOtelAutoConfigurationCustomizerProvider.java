@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 
 import static io.otel.pyroscope.OtelCompat.getBoolean;
 
@@ -66,21 +67,48 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
      * Open Telemetry extension classes are loaded by an isolated class loader.
      * As such, they can't communicate with other parts of the application (e.g., the Pyroscope SDK).
      * <p>
-     * If the Pyroscope SDK is loaded as a java agent, we'll access it via the system class loader and interact with it
-     * via a bridge.
+     * We try multiple classloaders in order:
+     * <ol>
+     *   <li>Thread context classloader — Spring Boot sets this to {@code LaunchedURLClassLoader} which
+     *       sees classes inside the fat JAR (including the user's pyroscope dependency).</li>
+     *   <li>System classloader — covers the {@code -javaagent} premain case where pyroscope is loaded
+     *       directly into the system classloader.</li>
+     *   <li>Parent chains of the above — covers other delegating classloader arrangements.</li>
+     * </ol>
+     * Both {@code ProfilerSdk} and {@code Pyroscope$LabelsWrapper} are loaded from the same classloader
+     * so they operate on the same profiler state and constants map.
      */
     private static OtelProfilerSdkBridge loadProfilerSdk() {
-        try {
-            ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-            Class<?> sdkClass = systemClassLoader.loadClass("io.pyroscope.javaagent.ProfilerSdk");
-            Object sdk = sdkClass.getDeclaredConstructor().newInstance();
+        LinkedHashSet<ClassLoader> candidates = new LinkedHashSet<>();
+        addClassLoaderChain(candidates, Thread.currentThread().getContextClassLoader());
+        addClassLoaderChain(candidates, ClassLoader.getSystemClassLoader());
 
-            Class<?> labelsWrapperClass = systemClassLoader.loadClass(getLabelsWrapperClassName());
-            Method registerConstant = labelsWrapperClass.getDeclaredMethod("registerConstant", String.class);
+        String sdkClassName = "io.pyroscope.javaagent.ProfilerSdk";
+        String labelsClassName = getLabelsWrapperClassName();
 
-            return new OtelProfilerSdkBridge(sdk, registerConstant);
-        } catch (Exception e) {
-            throw new RuntimeException("Error loading the profiler SDK", e);
+        Exception lastException = null;
+        for (ClassLoader cl : candidates) {
+            try {
+                Class<?> sdkClass = cl.loadClass(sdkClassName);
+                Object sdk = sdkClass.getDeclaredConstructor().newInstance();
+                Class<?> labelsWrapperClass = cl.loadClass(labelsClassName);
+                Method registerConstant = labelsWrapperClass.getDeclaredMethod("registerConstant", String.class);
+                return new OtelProfilerSdkBridge(sdk, registerConstant);
+            } catch (ClassNotFoundException e) {
+                lastException = e;
+                // This classloader doesn't have ProfilerSdk — try the next one.
+            } catch (Exception e) {
+                // ProfilerSdk was found but failed to instantiate — real error.
+                throw new RuntimeException("Error loading the profiler SDK from classloader: " + cl, e);
+            }
+        }
+        throw new RuntimeException("Error loading the profiler SDK", lastException);
+    }
+
+    private static void addClassLoaderChain(LinkedHashSet<ClassLoader> candidates, ClassLoader cl) {
+        while (cl != null) {
+            candidates.add(cl);
+            cl = cl.getParent();
         }
     }
 
