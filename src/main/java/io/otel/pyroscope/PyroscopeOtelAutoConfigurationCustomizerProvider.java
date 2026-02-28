@@ -23,43 +23,55 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
             OtelProfilerSdkBridge profilerSdk = null;
+            boolean loadFailed = false;
             try {
                 profilerSdk = loadProfilerSdk();
             } catch (Exception e) {
-                // This usually means we are running without the Pyroscope SDK.
-                // We'll instead use the Profiler bundled with the extension.
-                System.out.println("Could not load the profiler SDK, will continue with the built-in one!");
-                System.out.println("  Reason: " + e.getMessage());
+                System.out.println("[pyroscope-otel] Could not load the profiler SDK at startup.");
+                System.out.println("[pyroscope-otel]   Reason: " + e.getMessage());
                 ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
                 if (systemClassLoader instanceof URLClassLoader) {
-                    System.out.println("  JARs visible to system classloader:");
+                    System.out.println("[pyroscope-otel]   JARs visible to system classloader:");
                     for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
-                        System.out.println("    " + url);
+                        System.out.println("[pyroscope-otel]     " + url);
                     }
                 } else {
-                    System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
+                    System.out.println("[pyroscope-otel]   System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
                 }
+                loadFailed = true;
             }
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
-            if (startProfiling) {
-                if (profilerSdk == null) {
-                    PyroscopeAgent.start(Config.build());
-                } else if (!profilerSdk.isProfilingStarted()) {
-                    profilerSdk.startProfiling();
-                }
-            }
 
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
                     .setRootSpanOnly(getBoolean(cfg, "otel.pyroscope.root.span.only", true))
                     .setAddSpanName(getBoolean(cfg, "otel.pyroscope.add.span.name", true))
                     .build();
 
-            return tpBuilder.addSpanProcessor(
-                    new PyroscopeOtelSpanProcessor(
-                            pyroOtelConfig,
-                            profilerSdk
-                    ));
+            PyroscopeOtelSpanProcessor processor;
+            if (!loadFailed) {
+                // Bridge found immediately — covers the -javaagent premain case where pyroscope
+                // is in the system classloader (not inside a Spring Boot fat JAR).
+                if (startProfiling && !profilerSdk.isProfilingStarted()) {
+                    profilerSdk.startProfiling();
+                }
+                processor = new PyroscopeOtelSpanProcessor(pyroOtelConfig, profilerSdk);
+            } else if (!startProfiling) {
+                // SDK not found yet AND start.profiling=false: this is the Spring Boot fat JAR +
+                // programmatic-start scenario. Spring Boot's LaunchedURLClassLoader (which can see
+                // the SDK inside the fat JAR) does not exist yet at premain time — it is created by
+                // JarLauncher.main() after the OTel agent finishes. Defer bridge initialization to
+                // the first span, by which time Spring Boot will have set up the context classloader.
+                System.out.println("[pyroscope-otel] Will retry bridge initialization on first span (Spring Boot fat JAR with programmatic profiler start detected).");
+                processor = new PyroscopeOtelSpanProcessor(pyroOtelConfig, PyroscopeOtelAutoConfigurationCustomizerProvider::loadProfilerSdk);
+            } else {
+                // SDK not found at startup and start.profiling=true: start the bundled profiler now.
+                System.out.println("[pyroscope-otel] Starting built-in profiler.");
+                PyroscopeAgent.start(Config.build());
+                processor = new PyroscopeOtelSpanProcessor(pyroOtelConfig, (OtelProfilerSdkBridge) null);
+            }
+
+            return tpBuilder.addSpanProcessor(processor);
         });
     }
 
@@ -78,13 +90,18 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
      * Both {@code ProfilerSdk} and {@code Pyroscope$LabelsWrapper} are loaded from the same classloader
      * so they operate on the same profiler state and constants map.
      */
-    private static OtelProfilerSdkBridge loadProfilerSdk() {
+    static OtelProfilerSdkBridge loadProfilerSdk() {
         LinkedHashSet<ClassLoader> candidates = new LinkedHashSet<>();
         addClassLoaderChain(candidates, Thread.currentThread().getContextClassLoader());
         addClassLoaderChain(candidates, ClassLoader.getSystemClassLoader());
 
         String sdkClassName = "io.pyroscope.javaagent.ProfilerSdk";
         String labelsClassName = getLabelsWrapperClassName();
+
+        System.out.println("[pyroscope-otel] Searching for Pyroscope SDK across " + candidates.size() + " classloader(s):");
+        for (ClassLoader cl : candidates) {
+            System.out.println("[pyroscope-otel]   - " + cl);
+        }
 
         Exception lastException = null;
         for (ClassLoader cl : candidates) {
@@ -93,10 +110,11 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
                 Object sdk = sdkClass.getDeclaredConstructor().newInstance();
                 Class<?> labelsWrapperClass = cl.loadClass(labelsClassName);
                 Method registerConstant = labelsWrapperClass.getDeclaredMethod("registerConstant", String.class);
+                System.out.println("[pyroscope-otel] Pyroscope SDK loaded successfully via: " + cl);
                 return new OtelProfilerSdkBridge(sdk, registerConstant);
             } catch (ClassNotFoundException e) {
+                System.out.println("[pyroscope-otel]   " + cl + ": class not found (" + e.getMessage() + ")");
                 lastException = e;
-                // This classloader doesn't have ProfilerSdk — try the next one.
             } catch (Exception e) {
                 // ProfilerSdk was found but failed to instantiate — real error.
                 throw new RuntimeException("Error loading the profiler SDK from classloader: " + cl, e);
