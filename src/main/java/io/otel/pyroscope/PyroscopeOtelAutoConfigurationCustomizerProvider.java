@@ -3,10 +3,9 @@ package io.otel.pyroscope;
 
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
-import io.pyroscope.javaagent.PyroscopeAgent;
-import io.pyroscope.javaagent.config.Config;
+import io.pyroscope.agent.api.ProfilerApi;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Base64;
@@ -21,75 +20,56 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
-            OtelProfilerSdkBridge profilerSdk = null;
-            try {
-                profilerSdk = loadProfilerSdk();
-            } catch (Exception e) {
-                // This usually means we are running without the Pyroscope SDK.
-                // We'll instead use the Profiler bundled with the extension.
-                System.out.println("Could not load the profiler SDK, will continue with the built-in one!");
-                System.out.println("  Reason: " + e.getMessage());
-                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-                if (systemClassLoader instanceof URLClassLoader) {
-                    System.out.println("  JARs visible to system classloader:");
-                    for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
-                        System.out.println("    " + url);
-                    }
-                } else {
-                    System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
-                }
-            }
+            // Try to load ProfilerSdk from system classloader.
+            // This handles the case where pyroscope-java is on the system classpath
+            // (e.g., loaded as a -javaagent). The cast works because ProfilerApi
+            // is injected into the bootstrap classloader by the instrumentation module,
+            // and ProfilerSdk (from system classloader) implements the same ProfilerApi.
+            tryLoadProfilerSdkFromSystemClassLoader();
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                if (profilerSdk == null) {
-                    PyroscopeAgent.start(Config.build());
-                } else if (!profilerSdk.isProfilingStarted()) {
-                    profilerSdk.startProfiling();
-                }
+                PyroscopeOtelSpanProcessor.PROFILER.get().startProfiling();
             }
 
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
                     .setRootSpanOnly(getBoolean(cfg, "otel.pyroscope.root.span.only", true))
                     .setAddSpanName(getBoolean(cfg, "otel.pyroscope.add.span.name", true))
-                    .setAppSdkEnabled(getBoolean(cfg, "otel.pyroscope.app.sdk.enabled", false))
                     .build();
 
-            // Set the flag so instrumentation knows whether to capture SDK from App ClassLoader
-            OtelProfilerSdkBridge.appSdkEnabled = pyroOtelConfig.appSdkEnabled;
-
             return tpBuilder.addSpanProcessor(
-                    new PyroscopeOtelSpanProcessor(
-                            pyroOtelConfig,
-                            profilerSdk
-                    ));
+                    new PyroscopeOtelSpanProcessor(pyroOtelConfig));
         });
     }
 
-    /**
-     * Open Telemetry extension classes are loaded by an isolated class loader.
-     * As such, they can't communicate with other parts of the application (e.g., the Pyroscope SDK).
-     * <p>
-     * If the Pyroscope SDK is loaded as a java agent, we'll access it via the system class loader and interact with it
-     * via a bridge.
-     */
-    private static OtelProfilerSdkBridge loadProfilerSdk() {
+    private static void tryLoadProfilerSdkFromSystemClassLoader() {
         try {
-            ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-            Class<?> sdkClass = systemClassLoader.loadClass("io.pyroscope.javaagent.ProfilerSdk");
-            Object sdk = sdkClass.getDeclaredConstructor().newInstance();
-
-            Class<?> labelsWrapperClass = systemClassLoader.loadClass(getLabelsWrapperClassName());
-            Method registerConstant = labelsWrapperClass.getDeclaredMethod("registerConstant", String.class);
-
-            return new OtelProfilerSdkBridge(sdk, registerConstant);
+            ClassLoader systemCL = ClassLoader.getSystemClassLoader();
+            // Use Base64 encoding to prevent shadow jar relocation from renaming this string
+            Class<?> sdkClass = systemCL.loadClass(getProfilerSdkClassName());
+            Constructor<?> ctor = sdkClass.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            ProfilerApi sdk = (ProfilerApi) ctor.newInstance();
+            PyroscopeOtelSpanProcessor.PROFILER.set(sdk);
         } catch (Exception e) {
-            throw new RuntimeException("Error loading the profiler SDK", e);
+            // ProfilerSdk not on system classpath - using default vendored SDK
+            System.out.println("Could not load the profiler SDK from system classloader, will continue with the built-in one!");
+            System.out.println("  Reason: " + e.getMessage());
+            ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+            if (systemClassLoader instanceof URLClassLoader) {
+                System.out.println("  JARs visible to system classloader:");
+                for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
+                    System.out.println("    " + url);
+                }
+            } else {
+                System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
+            }
         }
     }
 
-    private static String getLabelsWrapperClassName() {
+    private static String getProfilerSdkClassName() {
         // otherwise the relocate plugin renames this string :shrug:
-        return new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmxhYmVscy52Mi5QeXJvc2NvcGUkTGFiZWxzV3JhcHBlcg=="));
+        // decodes to: io.pyroscope.javaagent.ProfilerSdk
+        return new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmphdmFhZ2VudC5Qcm9maWxlclNkaw=="));
     }
 }

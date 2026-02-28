@@ -7,8 +7,11 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Instrumentation module that registers ProfilerSdk instrumentation
- * and injects helper classes into the Application ClassLoader.
+ * Instrumentation module that hooks PyroscopeAgent.start() to capture a ProfilerSdk
+ * instance from the classloader that loaded PyroscopeAgent (e.g. Spring Boot CL).
+ *
+ * Injects ProfilerApi into the instrumented classloader so that ProfilerSdk
+ * (from the app classloader) can be directly cast to ProfilerApi without reflection.
  */
 public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
@@ -18,8 +21,9 @@ public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
     @Override
     public List<String> getAdditionalHelperClassNames() {
-        // Inject OtelProfilerSdkBridge into Application ClassLoader
-        return Collections.singletonList("io.otel.pyroscope.OtelProfilerSdkBridge");
+        // Inject ProfilerApi into the instrumented classloader so that ProfilerSdk
+        // (which implements ProfilerApi) can be cast to it without reflection.
+        return Collections.singletonList("io.pyroscope.agent.api.ProfilerApi");
     }
 
     @Override
