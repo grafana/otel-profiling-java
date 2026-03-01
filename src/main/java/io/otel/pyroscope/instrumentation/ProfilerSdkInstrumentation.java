@@ -13,7 +13,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
  * a ProfilerSdk instance from the same classloader that loaded PyroscopeAgent
  * (e.g. Spring Boot's custom classloader) and register it as the active profiler.
  *
- * NOTE: Class name strings are constructed via String.format to prevent the shadow
+ * NOTE: Class name strings are constructed via String.join to prevent the shadow
  * jar relocator from matching and renaming them. The relocator matches string
  * constants like "io.pyroscope.*" and would change them to
  * "io.otel.pyroscope.shadow.*", breaking type matchers.
@@ -25,9 +25,6 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
 
     // io.pyroscope.javaagent.PyroscopeAgent
     private static final String PYROSCOPE_AGENT_CLASS = PYROSCOPE_PKG + ".PyroscopeAgent";
-
-    // io.pyroscope.javaagent.ProfilerSdk
-    private static final String PROFILER_SDK_CLASS = PYROSCOPE_PKG + ".ProfilerSdk";
 
     @Override
     public ElementMatcher<TypeDescription> typeMatcher() {
@@ -50,28 +47,23 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
             try {
                 ClassLoader cl = hookedClass.getClassLoader();
                 System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent.start() hooked!");
-                System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader: " + cl);
-                System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader class: " + cl.getClass().getName());
+                System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
 
                 // Constructed at runtime to avoid shadow jar string relocation
                 // io.pyroscope.javaagent.ProfilerSdk
                 String sdkClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
 
-                // Load and instantiate ProfilerSdk from the app classloader
+                // Load and instantiate ProfilerSdk from the app classloader.
+                // ProfilerSdk implements ProfilerApi (injected as helper into this CL).
                 Class<?> sdkClass = cl.loadClass(sdkClassName);
-                System.out.println("[pyroscope-otel] Instrumentation: Loaded ProfilerSdk from classloader: " + sdkClass.getClassLoader());
                 java.lang.reflect.Constructor<?> ctor = sdkClass.getDeclaredConstructor();
                 ctor.setAccessible(true);
-                Object sdkInstance = ctor.newInstance();
-                System.out.println("[pyroscope-otel] Instrumentation: Created ProfilerSdk instance: " + sdkInstance.getClass().getName());
-                System.out.println("[pyroscope-otel] Instrumentation: ProfilerSdk interfaces: " + java.util.Arrays.toString(sdkInstance.getClass().getInterfaces()));
-
-                // Store the instance in system properties — visible to all classloaders.
-                // System.getProperties() returns a Hashtable<Object,Object> so it can store
-                // arbitrary object references. The span processor reads this key to pick up
-                // the app-classloader ProfilerSdk.
-                System.getProperties().put("io.pyroscope.otel.profilerSdk", sdkInstance);
-                System.out.println("[pyroscope-otel] Instrumentation: Stored ProfilerSdk in system properties");
+                // Cast to ProfilerApi — works because both ProfilerSdk and this advice code
+                // resolve ProfilerApi from the same classloader (app CL, where it was injected).
+                io.pyroscope.agent.api.ProfilerApi sdk =
+                    (io.pyroscope.agent.api.ProfilerApi) ctor.newInstance();
+                io.pyroscope.agent.api.ProfilerApi.Holder.INSTANCE.set(sdk);
+                System.out.println("[pyroscope-otel] Instrumentation: Set ProfilerApi.Holder.INSTANCE from " + cl.getClass().getName());
             } catch (Exception e) {
                 System.out.println("[pyroscope-otel] Instrumentation: FAILED to hook ProfilerSdk: " + e);
                 e.printStackTrace();

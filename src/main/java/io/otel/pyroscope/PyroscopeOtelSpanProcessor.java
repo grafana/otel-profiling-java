@@ -9,6 +9,7 @@ import io.opentelemetry.sdk.trace.SpanProcessor;
 
 import io.pyroscope.agent.api.ProfilerApi;
 
+import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -19,8 +20,10 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     // Default: the vendored/relocated embedded ProfilerSdk (created via ProfilerSdkFactory).
     // After shadow jar relocation, ProfilerSdkFactory becomes
     // io.otel.pyroscope.shadow.javaagent.ProfilerSdkFactory, creating the relocated ProfilerSdk.
-    // Updated by the instrumentation hook when PyroscopeAgent.start() is called
-    // in a custom classloader (e.g. Spring Boot).
+    //
+    // Updated when the instrumentation hook detects PyroscopeAgent.start() in a custom
+    // classloader (e.g. Spring Boot) — the hook sets the app-CL's ProfilerApi.Holder.INSTANCE,
+    // and this span processor picks it up via syncFromAppClassLoader().
     public static final AtomicReference<ProfilerApi> PROFILER = new AtomicReference<>(
             io.pyroscope.javaagent.ProfilerSdkFactory.create()
     );
@@ -49,8 +52,8 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         if (configuration.rootSpanOnly && !isRootSpan(span)) {
             return;
         }
-        // Check if the instrumentation hook has stored a ProfilerSdk from the app classloader
-        syncFromSystemProperties();
+        // Check if the instrumentation hook has set a ProfilerSdk from the app classloader
+        syncFromAppClassLoader();
         ProfilerApi api = PROFILER.get();
         if (!debugPrinted) {
             debugPrinted = true;
@@ -75,27 +78,49 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         PROFILER.get().setTracingContext(0, 0);
     }
 
-    private volatile boolean syncedFromSystemProperties = false;
+    private volatile boolean syncedFromAppClassLoader = false;
 
-    private void syncFromSystemProperties() {
-        if (syncedFromSystemProperties) {
+    /**
+     * Check if the instrumentation advice (running in the app classloader) has set
+     * a ProfilerSdk instance on ProfilerApi.Holder.INSTANCE (app CL's copy).
+     *
+     * Since the extension CL and app CL have different ProfilerApi class objects,
+     * we use reflection to read the app CL's Holder.INSTANCE and wrap the result
+     * in a ReflectionProfilerApiWrapper.
+     */
+    private void syncFromAppClassLoader() {
+        if (syncedFromAppClassLoader) {
             return;
         }
-        Object sdk = System.getProperties().get("io.pyroscope.otel.profilerSdk");
-        if (sdk != null) {
-            // The sdk object is from a different classloader (app CL), so we can't
-            // directly cast it to our ProfilerApi (extension CL). Instead, create a
-            // reflection-based wrapper that delegates calls via cached Method handles.
-            try {
-                ProfilerApi wrapper = new ReflectionProfilerApiWrapper(sdk);
-                PROFILER.set(wrapper);
-                syncedFromSystemProperties = true;
-                System.out.println("[pyroscope-otel] SpanProcessor: Synced PROFILER from system properties (app classloader ProfilerSdk)");
-                System.out.println("[pyroscope-otel] SpanProcessor: Wrapped impl: " + sdk.getClass().getName());
-                System.out.println("[pyroscope-otel] SpanProcessor: Wrapped classloader: " + sdk.getClass().getClassLoader());
-            } catch (Exception e) {
-                System.out.println("[pyroscope-otel] SpanProcessor: Failed to create wrapper: " + e);
+        // The app CL's ProfilerApi.Holder.INSTANCE was set by our advice.
+        // We find it by looking at all classloaders that have loaded our helper class.
+        // The advice sets the value on the copy of ProfilerApi injected into the app CL.
+        // We can find it via the thread context classloader (which is typically the app CL).
+        try {
+            ClassLoader appCL = Thread.currentThread().getContextClassLoader();
+            if (appCL == null) {
+                return;
             }
+            // Constructed at runtime to avoid shadow relocation
+            String holderClassName = String.join(".", "io", "pyroscope", "agent", "api") + ".ProfilerApi$Holder";
+            Class<?> holderClass = appCL.loadClass(holderClassName);
+            Field instanceField = holderClass.getField("INSTANCE");
+            @SuppressWarnings("unchecked")
+            AtomicReference<Object> holder = (AtomicReference<Object>) instanceField.get(null);
+            Object sdk = holder.get();
+            if (sdk == null) {
+                return;
+            }
+            ProfilerApi wrapper = new ReflectionProfilerApiWrapper(sdk);
+            PROFILER.set(wrapper);
+            syncedFromAppClassLoader = true;
+            System.out.println("[pyroscope-otel] SpanProcessor: Synced PROFILER from app classloader's ProfilerApi.Holder");
+            System.out.println("[pyroscope-otel] SpanProcessor: Wrapped impl: " + sdk.getClass().getName());
+            System.out.println("[pyroscope-otel] SpanProcessor: Wrapped classloader: " + sdk.getClass().getClassLoader());
+        } catch (ClassNotFoundException e) {
+            // ProfilerApi not yet loaded in app CL — will try again on next span
+        } catch (Exception e) {
+            System.out.println("[pyroscope-otel] SpanProcessor: Failed to sync from app classloader: " + e);
         }
     }
 

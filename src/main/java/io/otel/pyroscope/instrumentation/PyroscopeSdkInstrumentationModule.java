@@ -22,14 +22,13 @@ public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
     @Override
     public List<String> getAdditionalHelperClassNames() {
+        // Inject ProfilerApi and its Holder into the instrumented classloader so that:
+        // 1. ProfilerSdk (which implements ProfilerApi) can be loaded without NoClassDefFoundError
+        // 2. The advice can cast the ProfilerSdk instance to ProfilerApi
+        // 3. The advice can set ProfilerApi.Holder.INSTANCE for the span processor to pick up
         return Arrays.asList(
             "io.pyroscope.agent.api.ProfilerApi",
-            "io.pyroscope.agent.api.ProfilerApi$Holder",
-            // The advice class and its enclosing class must be injected because ByteBuddy
-            // inlines the advice code but the JVM still needs to resolve static field
-            // references on the advice class.
-            "io.otel.pyroscope.instrumentation.ProfilerSdkInstrumentation",
-            "io.otel.pyroscope.instrumentation.ProfilerSdkInstrumentation$StartAdvice"
+            "io.pyroscope.agent.api.ProfilerApi$Holder"
         );
     }
 
