@@ -23,7 +23,8 @@ sourceSets {
 }
 
 dependencies {
-    implementation("io.pyroscope:agent:${pyroscopeVersion}")
+    // TODO revert: use local pyroscope.jar instead of Maven Central until new version is published
+    implementation files("${rootProject.projectDir}/pyroscope.jar")
 
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
