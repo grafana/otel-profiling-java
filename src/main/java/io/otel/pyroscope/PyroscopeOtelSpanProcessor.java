@@ -81,12 +81,17 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     private volatile boolean syncedFromAppClassLoader = false;
 
     /**
-     * Check if the instrumentation advice (running in the app classloader) has set
-     * a ProfilerSdk instance on ProfilerApi.Holder.INSTANCE (app CL's copy).
+     * Picks up the ProfilerSdk instance that the instrumentation advice stored in the
+     * app classloader's ProfilerApi.Holder.INSTANCE.
      *
-     * Since the extension CL and app CL have different ProfilerApi class objects,
-     * we use reflection to read the app CL's Holder.INSTANCE and wrap the result
-     * in a ReflectionProfilerApiWrapper.
+     * Why we can't use ProfilerApi.Holder.INSTANCE directly:
+     * The extension CL and the app CL each have their own copy of ProfilerApi (helper
+     * injection creates a separate Class object per classloader). A direct cast like
+     * {@code (ProfilerApi) appClSdk} throws ClassCastException because the JVM sees two
+     * unrelated ProfilerApi types. We therefore wrap the cross-CL object in a
+     * {@link ReflectionProfilerApiWrapper} that delegates via cached Method handles —
+     * this is the standard pattern for bridging classloader boundaries without a shared
+     * parent classloader.
      */
     private void syncFromAppClassLoader() {
         if (syncedFromAppClassLoader) {
@@ -125,8 +130,10 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     }
 
     /**
-     * Thin reflection wrapper around a ProfilerSdk instance from a different classloader.
-     * Caches Method handles on construction for zero-lookup overhead in the hot path.
+     * Bridges a ProfilerSdk loaded by the app classloader into the extension classloader's
+     * ProfilerApi interface. Required because the two classloaders have separate ProfilerApi
+     * Class objects — a direct cast is impossible. Method handles are cached at construction
+     * time so the hot path (setTracingContext, registerConstant) has no reflection lookup cost.
      */
     static class ReflectionProfilerApiWrapper implements ProfilerApi {
         private final Object delegate;

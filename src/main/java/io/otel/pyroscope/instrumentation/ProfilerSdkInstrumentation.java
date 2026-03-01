@@ -20,15 +20,10 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
  */
 public class ProfilerSdkInstrumentation implements TypeInstrumentation {
 
-    // Constructed at runtime to avoid shadow jar relocation of "io.pyroscope" prefix.
-    private static final String PYROSCOPE_PKG = String.join(".", "io", "pyroscope", "javaagent");
-
-    // io.pyroscope.javaagent.PyroscopeAgent
-    private static final String PYROSCOPE_AGENT_CLASS = PYROSCOPE_PKG + ".PyroscopeAgent";
-
     @Override
     public ElementMatcher<TypeDescription> typeMatcher() {
-        return named(PYROSCOPE_AGENT_CLASS);
+        // String.join to prevent shadow jar relocator from renaming "io.pyroscope" prefix
+        return named(String.join(".", "io", "pyroscope", "javaagent", "PyroscopeAgent"));
     }
 
     @Override
