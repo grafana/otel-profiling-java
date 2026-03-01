@@ -7,6 +7,7 @@ import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
+import io.pyroscope.agent.api.IProfilingTracing;
 import io.pyroscope.agent.api.ProfilerApi;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,13 +40,13 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         return true;
     }
 
-    private ProfilerApi getProfiler() {
+    private IProfilingTracing getProfiler() {
         // Prefer the app-classloader's ProfilerSdk set by the instrumentation hook
-        // via ProfilerApi.Holder.INSTANCE. Falls back to the vendored default.
+        // via IProfilingTracing.Holder.INSTANCE. Falls back to the vendored default.
         // NOTE: the cast may throw ClassCastException when the extension CL and app CL
-        // have separate ProfilerApi Class objects — this will be fixed later by ensuring
-        // both classloaders share the same ProfilerApi (e.g. via bootstrap injection).
-        ProfilerApi fromHolder = ProfilerApi.Holder.INSTANCE.get();
+        // have separate IProfilingTracing Class objects — this will be fixed later by
+        // ensuring both classloaders share the same class (e.g. via bootstrap injection).
+        IProfilingTracing fromHolder = IProfilingTracing.Holder.INSTANCE.get();
         if (fromHolder != null) {
             return fromHolder;
         }
@@ -57,7 +58,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         if (configuration.rootSpanOnly && !isRootSpan(span)) {
             return;
         }
-        ProfilerApi api = getProfiler();
+        IProfilingTracing api = getProfiler();
         String strProfileId = span.getSpanContext().getSpanId();
         long spanId = parseSpanId(strProfileId);
         String spanName = configuration.addSpanName ? span.getName() : null;

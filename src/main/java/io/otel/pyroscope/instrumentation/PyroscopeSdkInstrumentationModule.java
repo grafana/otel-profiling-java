@@ -22,13 +22,15 @@ public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
     @Override
     public List<String> getAdditionalHelperClassNames() {
-        // Inject ProfilerApi and its Holder into the instrumented classloader so that:
-        // 1. ProfilerSdk (which implements ProfilerApi) can be loaded without NoClassDefFoundError
-        // 2. The advice can cast the ProfilerSdk instance to ProfilerApi
-        // 3. The advice can set ProfilerApi.Holder.INSTANCE for the span processor to pick up
+        // Inject IProfilingTracing, its Holder, and ProfilerApi into the instrumented
+        // classloader so that:
+        // 1. ProfilerSdk (which implements ProfilerApi extends IProfilingTracing) can load
+        // 2. The advice can cast the ProfilerSdk instance to IProfilingTracing
+        // 3. The advice can set IProfilingTracing.Holder.INSTANCE for the span processor
         return Arrays.asList(
-            "io.pyroscope.agent.api.ProfilerApi",
-            "io.pyroscope.agent.api.ProfilerApi$Holder"
+            "io.pyroscope.agent.api.IProfilingTracing",
+            "io.pyroscope.agent.api.IProfilingTracing$Holder",
+            "io.pyroscope.agent.api.ProfilerApi"
         );
     }
 

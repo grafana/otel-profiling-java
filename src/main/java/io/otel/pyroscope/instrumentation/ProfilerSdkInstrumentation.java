@@ -53,12 +53,12 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
                 Class<?> sdkClass = cl.loadClass(sdkClassName);
                 java.lang.reflect.Constructor<?> ctor = sdkClass.getDeclaredConstructor();
                 ctor.setAccessible(true);
-                // Cast to ProfilerApi — works because both ProfilerSdk and this advice code
-                // resolve ProfilerApi from the same classloader (app CL, where it was injected).
-                io.pyroscope.agent.api.ProfilerApi sdk =
-                    (io.pyroscope.agent.api.ProfilerApi) ctor.newInstance();
-                io.pyroscope.agent.api.ProfilerApi.Holder.INSTANCE.set(sdk);
-                System.out.println("[pyroscope-otel] Instrumentation: Set ProfilerApi.Holder.INSTANCE from " + cl.getClass().getName());
+                // Cast to IProfilingTracing — works because both ProfilerSdk and this advice
+                // code resolve IProfilingTracing from the same classloader (app CL, where it was injected).
+                io.pyroscope.agent.api.IProfilingTracing sdk =
+                    (io.pyroscope.agent.api.IProfilingTracing) ctor.newInstance();
+                io.pyroscope.agent.api.IProfilingTracing.Holder.INSTANCE.set(sdk);
+                System.out.println("[pyroscope-otel] Instrumentation: Set IProfilingTracing.Holder.INSTANCE from " + cl.getClass().getName());
             } catch (Exception e) {
                 System.out.println("[pyroscope-otel] Instrumentation: FAILED to hook ProfilerSdk: " + e);
                 e.printStackTrace();
