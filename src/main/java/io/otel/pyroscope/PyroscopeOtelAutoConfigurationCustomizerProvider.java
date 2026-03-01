@@ -3,8 +3,7 @@ package io.otel.pyroscope;
 
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
-import io.pyroscope.agent.api.IProfilingTracing;
-import io.pyroscope.agent.api.ProfilerApi;
+import io.pyroscope.agent.api.IProfilingBridge;
 
 import java.lang.reflect.Constructor;
 import java.net.URL;
@@ -20,16 +19,16 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
-            // Try to load ProfilerSdk from system classloader.
+            // Try to load ProfilingBridgeImpl from system classloader.
             // This handles the case where pyroscope-java is on the system classpath
-            // (e.g., loaded as a -javaagent). The cast works because ProfilerApi
+            // (e.g., loaded as a -javaagent). The cast works because IProfilingBridge
             // is injected into the bootstrap classloader by the instrumentation module,
-            // and ProfilerSdk (from system classloader) implements the same ProfilerApi.
-            tryLoadProfilerSdkFromSystemClassLoader();
+            // and ProfilingBridgeImpl (from system classloader) implements the same interface.
+            tryLoadFromSystemClassLoader();
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                ((ProfilerApi) IProfilingTracing.Holder.INSTANCE.get()).startProfiling();
+                IProfilingBridge.Holder.INSTANCE.get().startProfiling();
             }
 
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
@@ -42,24 +41,23 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
         });
     }
 
-    private static void tryLoadProfilerSdkFromSystemClassLoader() {
+    private static void tryLoadFromSystemClassLoader() {
         try {
             ClassLoader systemCL = ClassLoader.getSystemClassLoader();
-            System.out.println("[pyroscope-otel] AutoConfig: Trying to load ProfilerSdk from system classloader: " + systemCL);
+            System.out.println("[pyroscope-otel] AutoConfig: Trying to load ProfilingBridgeImpl from system classloader: " + systemCL);
             System.out.println("[pyroscope-otel] AutoConfig: System classloader class: " + systemCL.getClass().getName());
-            // Use Base64 encoding to prevent shadow jar relocation from renaming this string
-            String className = getProfilerSdkClassName();
+            // Constructed at runtime so the shadow jar relocator doesn't rename it
+            String className = String.join(".", "io", "pyroscope", "javaagent", "ProfilingBridgeImpl");
             System.out.println("[pyroscope-otel] AutoConfig: Loading class: " + className);
             Class<?> sdkClass = systemCL.loadClass(className);
-            System.out.println("[pyroscope-otel] AutoConfig: Loaded ProfilerSdk, classloader: " + sdkClass.getClassLoader());
+            System.out.println("[pyroscope-otel] AutoConfig: Loaded ProfilingBridgeImpl, classloader: " + sdkClass.getClassLoader());
             Constructor<?> ctor = sdkClass.getDeclaredConstructor();
             ctor.setAccessible(true);
-            ProfilerApi sdk = (ProfilerApi) ctor.newInstance();
-            System.out.println("[pyroscope-otel] AutoConfig: Cast to ProfilerApi succeeded! Using system-classloader ProfilerSdk.");
-            IProfilingTracing.Holder.INSTANCE.set(sdk);
+            IProfilingBridge bridge = (IProfilingBridge) ctor.newInstance();
+            System.out.println("[pyroscope-otel] AutoConfig: Cast to IProfilingBridge succeeded! Using system-classloader ProfilingBridgeImpl.");
+            IProfilingBridge.Holder.INSTANCE.set(bridge);
         } catch (Exception e) {
-            // ProfilerSdk not on system classpath - using default vendored SDK
-            System.out.println("[pyroscope-otel] AutoConfig: Could not load ProfilerSdk from system classloader, will continue with the built-in one!");
+            System.out.println("[pyroscope-otel] AutoConfig: Could not load ProfilingBridgeImpl from system classloader, will continue with the built-in one!");
             System.out.println("  Reason: " + e.getMessage());
             ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
             if (systemClassLoader instanceof URLClassLoader) {
@@ -71,10 +69,5 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
                 System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
             }
         }
-    }
-
-    private static String getProfilerSdkClassName() {
-        // Constructed at runtime so the shadow jar relocator doesn't rename it
-        return String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
     }
 }

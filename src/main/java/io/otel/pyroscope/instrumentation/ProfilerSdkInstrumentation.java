@@ -9,9 +9,9 @@ import net.bytebuddy.matcher.ElementMatcher;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
 /**
- * Instrumentation that hooks PyroscopeAgent.start() to capture
- * a ProfilerSdk instance from the same classloader that loaded PyroscopeAgent
- * (e.g. Spring Boot's custom classloader) and register it as the active profiler.
+ * Instrumentation that hooks PyroscopeAgent.start() to capture a ProfilingBridgeImpl
+ * instance from the same classloader that loaded PyroscopeAgent (e.g. Spring Boot's
+ * custom classloader) and register it as the active profiling bridge.
  *
  * NOTE: Class name strings are constructed via String.join to prevent the shadow
  * jar relocator from matching and renaming them. The relocator matches string
@@ -45,22 +45,20 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
                 System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
 
                 // Constructed at runtime to avoid shadow jar string relocation
-                // io.pyroscope.javaagent.ProfilerSdk
-                String sdkClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
+                String implClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilingBridgeImpl");
 
-                // Load and instantiate ProfilerSdk from the app classloader.
-                // ProfilerSdk implements ProfilerApi (injected as helper into this CL).
-                Class<?> sdkClass = cl.loadClass(sdkClassName);
-                java.lang.reflect.Constructor<?> ctor = sdkClass.getDeclaredConstructor();
+                // Load and instantiate ProfilingBridgeImpl from the app classloader.
+                Class<?> implClass = cl.loadClass(implClassName);
+                java.lang.reflect.Constructor<?> ctor = implClass.getDeclaredConstructor();
                 ctor.setAccessible(true);
-                // Cast to IProfilingTracing — works because both ProfilerSdk and this advice
-                // code resolve IProfilingTracing from the same classloader (app CL, where it was injected).
-                io.pyroscope.agent.api.IProfilingTracing sdk =
-                    (io.pyroscope.agent.api.IProfilingTracing) ctor.newInstance();
-                io.pyroscope.agent.api.IProfilingTracing.Holder.INSTANCE.set(sdk);
-                System.out.println("[pyroscope-otel] Instrumentation: Set IProfilingTracing.Holder.INSTANCE from " + cl.getClass().getName());
+                // Cast to IProfilingBridge — works because both ProfilingBridgeImpl and this advice
+                // code resolve IProfilingBridge from the same classloader (app CL, where it was injected).
+                io.pyroscope.agent.api.IProfilingBridge bridge =
+                    (io.pyroscope.agent.api.IProfilingBridge) ctor.newInstance();
+                io.pyroscope.agent.api.IProfilingBridge.Holder.INSTANCE.set(bridge);
+                System.out.println("[pyroscope-otel] Instrumentation: Set IProfilingBridge.Holder.INSTANCE from " + cl.getClass().getName());
             } catch (Exception e) {
-                System.out.println("[pyroscope-otel] Instrumentation: FAILED to hook ProfilerSdk: " + e);
+                System.out.println("[pyroscope-otel] Instrumentation: FAILED to hook ProfilingBridgeImpl: " + e);
                 e.printStackTrace();
             }
         }

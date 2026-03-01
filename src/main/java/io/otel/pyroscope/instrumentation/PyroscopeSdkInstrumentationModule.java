@@ -8,11 +8,11 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Instrumentation module that hooks PyroscopeAgent.start() to capture a ProfilerSdk
+ * Instrumentation module that hooks PyroscopeAgent.start() to capture a ProfilingBridgeImpl
  * instance from the classloader that loaded PyroscopeAgent (e.g. Spring Boot CL).
  *
- * Injects ProfilerApi into the instrumented classloader so that ProfilerSdk
- * (from the app classloader) can be directly cast to ProfilerApi without reflection.
+ * Injects IProfilingBridge into the instrumented classloader so that ProfilingBridgeImpl
+ * (from the app classloader) can be directly cast without reflection.
  */
 public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
@@ -22,15 +22,13 @@ public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
     @Override
     public List<String> getAdditionalHelperClassNames() {
-        // Inject IProfilingTracing, its Holder, and ProfilerApi into the instrumented
-        // classloader so that:
-        // 1. ProfilerSdk (which implements ProfilerApi extends IProfilingTracing) can load
-        // 2. The advice can cast the ProfilerSdk instance to IProfilingTracing
-        // 3. The advice can set IProfilingTracing.Holder.INSTANCE for the span processor
+        // Inject IProfilingBridge and its Holder into the instrumented classloader so that:
+        // 1. ProfilingBridgeImpl (which implements IProfilingBridge) can load
+        // 2. The advice can cast the ProfilingBridgeImpl instance to IProfilingBridge
+        // 3. The advice can set IProfilingBridge.Holder.INSTANCE for the span processor
         return Arrays.asList(
-            "io.pyroscope.agent.api.IProfilingTracing",
-            "io.pyroscope.agent.api.IProfilingTracing$Holder",
-            "io.pyroscope.agent.api.ProfilerApi"
+            "io.pyroscope.agent.api.IProfilingBridge",
+            "io.pyroscope.agent.api.IProfilingBridge$Holder"
         );
     }
 
