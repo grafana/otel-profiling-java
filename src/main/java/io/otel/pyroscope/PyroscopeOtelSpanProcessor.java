@@ -8,21 +8,21 @@ import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
 import io.pyroscope.agent.api.IProfilingTracing;
-import io.pyroscope.agent.api.ProfilerApi;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 
 public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
 
-    // Default: the vendored/relocated embedded ProfilerSdk (created via ProfilerSdkFactory).
-    // After shadow jar relocation, ProfilerSdkFactory becomes
-    // io.otel.pyroscope.shadow.javaagent.ProfilerSdkFactory, creating the relocated ProfilerSdk.
-    public static final AtomicReference<ProfilerApi> PROFILER = new AtomicReference<>(
-            io.pyroscope.javaagent.ProfilerSdkFactory.create()
-    );
+    static {
+        // Initialize with the vendored/relocated embedded ProfilerSdk as the default.
+        // After shadow jar relocation, ProfilerSdkFactory becomes
+        // io.otel.pyroscope.shadow.javaagent.ProfilerSdkFactory, creating the relocated ProfilerSdk.
+        // This may be replaced later by the app-classloader's ProfilerSdk via:
+        // - tryLoadProfilerSdkFromSystemClassLoader() in AutoConfig, or
+        // - ProfilerSdkInstrumentation hooking PyroscopeAgent.start()
+        IProfilingTracing.Holder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilerSdkFactory.create());
+    }
 
     private final PyroscopeOtelConfiguration configuration;
 
@@ -41,16 +41,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     }
 
     private IProfilingTracing getProfiler() {
-        // Prefer the app-classloader's ProfilerSdk set by the instrumentation hook
-        // via IProfilingTracing.Holder.INSTANCE. Falls back to the vendored default.
-        // NOTE: the cast may throw ClassCastException when the extension CL and app CL
-        // have separate IProfilingTracing Class objects — this will be fixed later by
-        // ensuring both classloaders share the same class (e.g. via bootstrap injection).
-        IProfilingTracing fromHolder = IProfilingTracing.Holder.INSTANCE.get();
-        if (fromHolder != null) {
-            return fromHolder;
-        }
-        return PROFILER.get();
+        return IProfilingTracing.Holder.INSTANCE.get();
     }
 
     @Override
