@@ -60,12 +60,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         ProfilerApi api = getProfiler();
         String strProfileId = span.getSpanContext().getSpanId();
         long spanId = parseSpanId(strProfileId);
-        long spanName;
-        if (configuration.addSpanName) {
-            spanName = api.registerConstant(span.getName());
-        } else {
-            spanName = 0;
-        }
+        String spanName = configuration.addSpanName ? span.getName() : null;
 
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
         api.setTracingContext(spanId, spanName);
@@ -73,7 +68,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     @Override
     public void onEnd(ReadableSpan span) {
-        getProfiler().setTracingContext(0, 0);
+        getProfiler().setTracingContext(0, null);
     }
 
     public static long parseSpanId(String strProfileId) {
