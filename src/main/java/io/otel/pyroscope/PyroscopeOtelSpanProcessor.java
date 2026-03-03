@@ -7,7 +7,7 @@ import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
-import io.pyroscope.agent.api.IProfilingBridge;
+import io.pyroscope.javaagent.api.ProfilerApi;
 
 
 public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
@@ -15,13 +15,13 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
 
     static {
-        // Initialize with the vendored/relocated embedded ProfilingBridgeImpl as the default.
-        // After shadow jar relocation, ProfilingBridgeFactory becomes
-        // io.otel.pyroscope.shadow.javaagent.ProfilingBridgeFactory, creating the relocated ProfilingBridgeImpl.
-        // This may be replaced later by the app-classloader's ProfilingBridgeImpl via:
+        // Initialize with the vendored/relocated embedded ProfilerSdk as the default.
+        // After shadow jar relocation, ProfilerSdkFactory becomes
+        // io.otel.pyroscope.shadow.javaagent.ProfilerSdkFactory, creating the relocated ProfilerSdk.
+        // This may be replaced later by the app-classloader's ProfilerSdk via:
         // - tryLoadFromSystemClassLoader() in AutoConfig, or
-        // - ProfilingBridgeInstrumentation hooking PyroscopeAgent.start()
-        IProfilingBridge.Holder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilingBridgeFactory.create());
+        // - ProfilerSdkInstrumentation hooking PyroscopeAgent.start()
+        ProfilerApi.Holder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilerSdkFactory.create());
     }
 
     private final PyroscopeOtelConfiguration configuration;
@@ -40,8 +40,8 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         return true;
     }
 
-    private IProfilingBridge getProfiler() {
-        return IProfilingBridge.Holder.INSTANCE.get();
+    private ProfilerApi getProfiler() {
+        return ProfilerApi.Holder.INSTANCE.get();
     }
 
     @Override
@@ -49,10 +49,15 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         if (configuration.rootSpanOnly && !isRootSpan(span)) {
             return;
         }
-        IProfilingBridge api = getProfiler();
+        ProfilerApi api = getProfiler();
         String strProfileId = span.getSpanContext().getSpanId();
         long spanId = parseSpanId(strProfileId);
-        String spanName = configuration.addSpanName ? span.getName() : null;
+        long spanName;
+        if (configuration.addSpanName) {
+            spanName = api.registerConstant(span.getName());
+        } else {
+            spanName = 0;
+        }
 
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
         api.setTracingContext(spanId, spanName);
@@ -60,7 +65,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     @Override
     public void onEnd(ReadableSpan span) {
-        getProfiler().setTracingContext(0, null);
+        getProfiler().setTracingContext(0, 0);
     }
 
     public static long parseSpanId(String strProfileId) {

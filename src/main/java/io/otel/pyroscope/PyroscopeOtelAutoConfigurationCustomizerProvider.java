@@ -3,7 +3,7 @@ package io.otel.pyroscope;
 
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
-import io.pyroscope.agent.api.IProfilingBridge;
+import io.pyroscope.javaagent.api.ProfilerApi;
 
 import java.lang.reflect.Constructor;
 import java.net.URL;
@@ -19,16 +19,16 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
-            // Try to load ProfilingBridgeImpl from system classloader.
+            // Try to load ProfilerSdk from system classloader.
             // This handles the case where pyroscope-java is on the system classpath
-            // (e.g., loaded as a -javaagent). The cast works because IProfilingBridge
+            // (e.g., loaded as a -javaagent). The cast works because ProfilerApi
             // is injected into the bootstrap classloader by the instrumentation module,
-            // and ProfilingBridgeImpl (from system classloader) implements the same interface.
+            // and ProfilerSdk (from system classloader) implements the same interface.
             tryLoadFromSystemClassLoader();
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                IProfilingBridge.Holder.INSTANCE.get().startProfiling();
+                ProfilerApi.Holder.INSTANCE.get().startProfiling();
             }
 
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
@@ -44,20 +44,20 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     private static void tryLoadFromSystemClassLoader() {
         try {
             ClassLoader systemCL = ClassLoader.getSystemClassLoader();
-            System.out.println("[pyroscope-otel] AutoConfig: Trying to load ProfilingBridgeImpl from system classloader: " + systemCL);
+            System.out.println("[pyroscope-otel] AutoConfig: Trying to load ProfilerSdk from system classloader: " + systemCL);
             System.out.println("[pyroscope-otel] AutoConfig: System classloader class: " + systemCL.getClass().getName());
             // Constructed at runtime so the shadow jar relocator doesn't rename it
-            String className = String.join(".", "io", "pyroscope", "javaagent", "ProfilingBridgeImpl");
+            String className = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
             System.out.println("[pyroscope-otel] AutoConfig: Loading class: " + className);
             Class<?> sdkClass = systemCL.loadClass(className);
-            System.out.println("[pyroscope-otel] AutoConfig: Loaded ProfilingBridgeImpl, classloader: " + sdkClass.getClassLoader());
+            System.out.println("[pyroscope-otel] AutoConfig: Loaded ProfilerSdk, classloader: " + sdkClass.getClassLoader());
             Constructor<?> ctor = sdkClass.getDeclaredConstructor();
             ctor.setAccessible(true);
-            IProfilingBridge bridge = (IProfilingBridge) ctor.newInstance();
-            System.out.println("[pyroscope-otel] AutoConfig: Cast to IProfilingBridge succeeded! Using system-classloader ProfilingBridgeImpl.");
-            IProfilingBridge.Holder.INSTANCE.set(bridge);
+            ProfilerApi bridge = (ProfilerApi) ctor.newInstance();
+            System.out.println("[pyroscope-otel] AutoConfig: Cast to ProfilerApi succeeded! Using system-classloader ProfilerSdk.");
+            ProfilerApi.Holder.INSTANCE.set(bridge);
         } catch (Exception e) {
-            System.out.println("[pyroscope-otel] AutoConfig: Could not load ProfilingBridgeImpl from system classloader, will continue with the built-in one!");
+            System.out.println("[pyroscope-otel] AutoConfig: Could not load ProfilerSdk from system classloader, will continue with the built-in one!");
             System.out.println("  Reason: " + e.getMessage());
             ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
             if (systemClassLoader instanceof URLClassLoader) {
