@@ -55,8 +55,8 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
                 // code resolve ProfilerApi from the same classloader (app CL, where it was injected).
                 io.pyroscope.javaagent.api.ProfilerApi bridge =
                     (io.pyroscope.javaagent.api.ProfilerApi) ctor.newInstance();
-                io.pyroscope.javaagent.api.ProfilerApi.Holder.INSTANCE.set(bridge);
-                System.out.println("[pyroscope-otel] Instrumentation: Set ProfilerApi.Holder.INSTANCE from " + cl.getClass().getName());
+                io.pyroscope.javaagent.api.ProfilerApiHolder.INSTANCE.set(bridge);
+                System.out.println("[pyroscope-otel] Instrumentation: Set ProfilerApiHolder.INSTANCE from " + cl.getClass().getName());
             } catch (Exception e) {
                 System.out.println("[pyroscope-otel] Instrumentation: FAILED to hook ProfilerSdk: " + e);
                 e.printStackTrace();

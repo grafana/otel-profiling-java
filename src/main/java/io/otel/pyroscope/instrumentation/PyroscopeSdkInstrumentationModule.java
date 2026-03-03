@@ -22,13 +22,13 @@ public class PyroscopeSdkInstrumentationModule extends InstrumentationModule {
 
     @Override
     public List<String> getAdditionalHelperClassNames() {
-        // Inject ProfilerApi and its Holder into the instrumented classloader so that:
+        // Inject ProfilerApi and ProfilerApiHolder into the instrumented classloader so that:
         // 1. ProfilerSdk (which implements ProfilerApi) can load
         // 2. The advice can cast the ProfilerSdk instance to ProfilerApi
-        // 3. The advice can set ProfilerApi.Holder.INSTANCE for the span processor
+        // 3. The advice can set ProfilerApiHolder.INSTANCE for the span processor
         return Arrays.asList(
             "io.pyroscope.javaagent.api.ProfilerApi",
-            "io.pyroscope.javaagent.api.ProfilerApi$Holder",
+            "io.pyroscope.javaagent.api.ProfilerApiHolder",
             "io.pyroscope.javaagent.api.ProfilerScopedContext"
         );
     }

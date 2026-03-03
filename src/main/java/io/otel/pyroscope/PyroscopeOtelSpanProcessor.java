@@ -8,6 +8,7 @@ import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
 import io.pyroscope.javaagent.api.ProfilerApi;
+import io.pyroscope.javaagent.api.ProfilerApiHolder;
 
 
 public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
@@ -21,7 +22,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         // This may be replaced later by the app-classloader's ProfilerSdk via:
         // - tryLoadFromSystemClassLoader() in AutoConfig, or
         // - ProfilerSdkInstrumentation hooking PyroscopeAgent.start()
-        ProfilerApi.Holder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilerSdkFactory.create());
+        ProfilerApiHolder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilerSdkFactory.create());
     }
 
     private final PyroscopeOtelConfiguration configuration;
@@ -41,7 +42,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     }
 
     private ProfilerApi getProfiler() {
-        return ProfilerApi.Holder.INSTANCE.get();
+        return ProfilerApiHolder.INSTANCE.get();
     }
 
     @Override

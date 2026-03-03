@@ -26,6 +26,8 @@ dependencies {
     // TODO revert: use local pyroscope.jar instead of Maven Central until new version is published
     implementation files("${rootProject.projectDir}/pyroscope.jar")
 
+    compileOnly 'org.jetbrains:annotations:26.0.2'
+
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")

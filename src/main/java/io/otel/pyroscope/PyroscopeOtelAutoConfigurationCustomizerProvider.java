@@ -4,6 +4,7 @@ package io.otel.pyroscope;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.pyroscope.javaagent.api.ProfilerApi;
+import io.pyroscope.javaagent.api.ProfilerApiHolder;
 
 import java.lang.reflect.Constructor;
 import java.net.URL;
@@ -28,7 +29,7 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                ProfilerApi.Holder.INSTANCE.get().startProfiling();
+                ProfilerApiHolder.INSTANCE.get().startProfiling();
             }
 
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
@@ -55,7 +56,7 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             ctor.setAccessible(true);
             ProfilerApi bridge = (ProfilerApi) ctor.newInstance();
             System.out.println("[pyroscope-otel] AutoConfig: Cast to ProfilerApi succeeded! Using system-classloader ProfilerSdk.");
-            ProfilerApi.Holder.INSTANCE.set(bridge);
+            ProfilerApiHolder.INSTANCE.set(bridge);
         } catch (Exception e) {
             System.out.println("[pyroscope-otel] AutoConfig: Could not load ProfilerSdk from system classloader, will continue with the built-in one!");
             System.out.println("  Reason: " + e.getMessage());
