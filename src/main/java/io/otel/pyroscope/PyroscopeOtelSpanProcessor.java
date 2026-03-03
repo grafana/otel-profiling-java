@@ -7,27 +7,27 @@ import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
-import io.pyroscope.PyroscopeAsyncProfiler;
-import io.pyroscope.labels.v2.Pyroscope;
-import io.pyroscope.vendor.one.profiler.AsyncProfiler;
+import io.pyroscope.agent.api.IProfilingBridge;
 
 
 public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
 
-    private final PyroscopeOtelConfiguration configuration;
-    private final OtelProfilerSdkBridge profilerSdk;
-    private final AsyncProfiler asprof;
+    static {
+        // Initialize with the vendored/relocated embedded ProfilingBridgeImpl as the default.
+        // After shadow jar relocation, ProfilingBridgeFactory becomes
+        // io.otel.pyroscope.shadow.javaagent.ProfilingBridgeFactory, creating the relocated ProfilingBridgeImpl.
+        // This may be replaced later by the app-classloader's ProfilingBridgeImpl via:
+        // - tryLoadFromSystemClassLoader() in AutoConfig, or
+        // - ProfilingBridgeInstrumentation hooking PyroscopeAgent.start()
+        IProfilingBridge.Holder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilingBridgeFactory.create());
+    }
 
-    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration, OtelProfilerSdkBridge profilerSdk) {
+    private final PyroscopeOtelConfiguration configuration;
+
+    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration) {
         this.configuration = configuration;
-        this.profilerSdk = profilerSdk;
-        if (profilerSdk == null) {
-            asprof = PyroscopeAsyncProfiler.getAsyncProfiler();
-        } else {
-            asprof = null;
-        }
     }
 
     @Override
@@ -40,46 +40,28 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         return true;
     }
 
+    private IProfilingBridge getProfiler() {
+        return IProfilingBridge.Holder.INSTANCE.get();
+    }
+
     @Override
     public void onStart(Context parentContext, ReadWriteSpan span) {
         if (configuration.rootSpanOnly && !isRootSpan(span)) {
             return;
         }
+        IProfilingBridge api = getProfiler();
         String strProfileId = span.getSpanContext().getSpanId();
-        long spanName;
         long spanId = parseSpanId(strProfileId);
-        if (configuration.addSpanName) {
-            spanName = registerConstant(span.getName());
-        } else {
-            spanName = 0;
-        }
+        String spanName = configuration.addSpanName ? span.getName() : null;
 
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
-        setTracingContextForSpan(spanId, spanName);
+        api.setTracingContext(spanId, spanName);
     }
-
 
     @Override
     public void onEnd(ReadableSpan span) {
-        setTracingContextForSpan(0, 0);
+        getProfiler().setTracingContext(0, null);
     }
-
-    private void setTracingContextForSpan(long spanId, long spanName) {
-        if (profilerSdk != null) {
-            profilerSdk.setTracingContext(spanId, spanName);
-        }
-        if (asprof != null) {
-            asprof.setTracingContext(spanId, spanName);
-        }
-    }
-
-    private  long registerConstant(String name) {
-        if (profilerSdk != null) {
-            return profilerSdk.registerConstant(name);
-        }
-        return Pyroscope.LabelsWrapper.registerConstant(name);
-    }
-
 
     public static long parseSpanId(String strProfileId) {
         if (strProfileId == null || strProfileId.length() != 16) {

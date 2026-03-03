@@ -23,7 +23,8 @@ sourceSets {
 }
 
 dependencies {
-    implementation("io.pyroscope:agent:${pyroscopeVersion}")
+    // TODO revert: use local pyroscope.jar instead of Maven Central until new version is published
+    implementation files("${rootProject.projectDir}/pyroscope.jar")
 
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
@@ -55,7 +56,7 @@ java {
 shadowJar {
     archiveFileName = "pyroscope-otel-javaagent-extension.jar"
     relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
-        exclude 'io.pyroscope.javaagent.ProfilerSdk'
+        exclude 'io.pyroscope.agent.api.*'
     }
     archiveClassifier.set('')
 }

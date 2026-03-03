@@ -79,6 +79,8 @@ services:
       # Disable logs and metrics exporters - no collector is running in this demo.
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
+      # Enable debug logging for OTel agent instrumentation
+      OTEL_JAVAAGENT_DEBUG: "true"
     ports:
       - "8082:8080"
     depends_on:
