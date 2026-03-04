@@ -20,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 	querierv1 "github.com/grafana/pyroscope/api/gen/proto/go/querier/v1"
 	"github.com/grafana/pyroscope/api/gen/proto/go/querier/v1/querierv1connect"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
@@ -255,16 +256,27 @@ func TestOtelExtension(t *testing.T) {
 
 	t.Logf("Extracted span ID from logs: %s", spanId)
 
-	eventually(t, func() bool {
-		var collapsed string
-		collapsed, err = querySpanPyroscopeProfile(t, pyroscopeURL,
-			labelSelector(appName), spanId)
-		return err == nil && collapsed != "" && strings.Contains(collapsed, expectedFibonacciStack)
-	})
+	eventuallyProfile(t, pyroscopeURL, appName, spanId)
 }
 
 func eventually(t *testing.T, condition func() bool) {
 	require.Eventually(t, condition, 30*time.Second, time.Second)
+}
+
+func eventuallyProfile(t *testing.T, pyroscopeURL string, appName string, spanId string) {
+	t.Helper()
+	var lastCollapsed string
+	var lastErr error
+	ok := assert.Eventually(t, func() bool {
+		lastCollapsed, lastErr = querySpanPyroscopeProfile(t, pyroscopeURL,
+			labelSelector(appName), spanId)
+		return lastErr == nil && lastCollapsed != "" && strings.Contains(lastCollapsed, expectedFibonacciStack)
+	}, 30*time.Second, time.Second)
+	if !ok {
+		t.Logf("last profile query error: %v", lastErr)
+		t.Logf("last collapsed profile:\n%s", lastCollapsed)
+		t.FailNow()
+	}
 }
 
 func TestOtelLibrary(t *testing.T) {
@@ -304,12 +316,7 @@ func TestOtelLibrary(t *testing.T) {
 		return strings.Contains(lastBody, "fibonacci(40) = 102334155") && err == nil && spanId != ""
 	})
 
-	eventually(t, func() bool {
-		var collapsed string
-		collapsed, err = querySpanPyroscopeProfile(t, pyroscopeURL,
-			labelSelector(appName), spanId)
-		return err == nil && collapsed != "" && strings.Contains(collapsed, expectedFibonacciStack)
-	})
+	eventuallyProfile(t, pyroscopeURL, appName, spanId)
 }
 
 func TestOtelExtensionManualStart(t *testing.T) {
@@ -360,10 +367,5 @@ func TestOtelExtensionManualStart(t *testing.T) {
 
 	t.Logf("Extracted span ID from logs: %s", spanId)
 
-	eventually(t, func() bool {
-		var collapsed string
-		collapsed, err = querySpanPyroscopeProfile(t, pyroscopeURL,
-			labelSelector(appName), spanId)
-		return err == nil && collapsed != "" && strings.Contains(collapsed, expectedFibonacciStack)
-	})
+	eventuallyProfile(t, pyroscopeURL, appName, spanId)
 }
