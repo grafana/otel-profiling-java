@@ -21,6 +21,7 @@ import (
 	"github.com/grafana/pyroscope/api/gen/proto/go/querier/v1/querierv1connect"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
@@ -55,42 +56,39 @@ func ensureJarsBuilt(t *testing.T, root string) {
 	require.NoError(t, cmd.Run(), "gradle build failed")
 }
 
-func startPyroscope(t *testing.T, ctx context.Context, networkName string) testcontainers.Container {
+func startPyroscope(t *testing.T, ctx context.Context, net *testcontainers.DockerNetwork) testcontainers.Container {
 	t.Helper()
-	req := testcontainers.ContainerRequest{
-		Image:        "grafana/pyroscope:latest",
-		ExposedPorts: []string{"4040/tcp"},
-		Networks:     []string{networkName},
-		NetworkAliases: map[string][]string{
-			networkName: {"pyroscope"},
+	req := testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:        "grafana/pyroscope:latest",
+			ExposedPorts: []string{"4040/tcp"},
+			WaitingFor:   wait.ForHTTP("/ready").WithPort("4040/tcp").WithStartupTimeout(60 * time.Second),
 		},
-		WaitingFor: wait.ForHTTP("/ready").WithPort("4040/tcp").WithStartupTimeout(60 * time.Second),
+		Started: true,
 	}
-	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	require.NoError(t, network.WithNetwork([]string{"pyroscope"}, net)(&req))
+	c, err := testcontainers.GenericContainer(ctx, req)
 	require.NoError(t, err, "failed to start pyroscope container")
 	return c
 }
 
-func startApp(t *testing.T, ctx context.Context, root string, dockerfile string, networkName string, env map[string]string) testcontainers.Container {
+func startApp(t *testing.T, ctx context.Context, root string, dockerfile string, net *testcontainers.DockerNetwork, env map[string]string) testcontainers.Container {
 	t.Helper()
-	req := testcontainers.ContainerRequest{
-		FromDockerfile: testcontainers.FromDockerfile{
-			Context:    root,
-			Dockerfile: dockerfile,
-			KeepImage:  true,
+	req := testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			FromDockerfile: testcontainers.FromDockerfile{
+				Context:    root,
+				Dockerfile: dockerfile,
+				KeepImage:  true,
+			},
+			ExposedPorts: []string{"8080/tcp"},
+			Env:          env,
+			WaitingFor:   wait.ForHTTP("/health").WithPort("8080/tcp").WithStartupTimeout(5 * time.Minute),
 		},
-		ExposedPorts: []string{"8080/tcp"},
-		Networks:     []string{networkName},
-		Env:          env,
-		WaitingFor:   wait.ForHTTP("/health").WithPort("8080/tcp").WithStartupTimeout(5 * time.Minute),
+		Started: true,
 	}
-	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	require.NoError(t, network.WithNetwork(nil, net)(&req))
+	c, err := testcontainers.GenericContainer(ctx, req)
 	require.NoError(t, err, "failed to start app container for %s", dockerfile)
 	return c
 }
@@ -292,20 +290,14 @@ func TestOtelExtension(t *testing.T) {
 	ensureJarsBuilt(t, root)
 
 	// Create network
-	networkName := "itest-otel-ext-" + fmt.Sprintf("%d", time.Now().UnixNano())
-	network, err := testcontainers.GenericNetwork(ctx, testcontainers.GenericNetworkRequest{
-		NetworkRequest: testcontainers.NetworkRequest{
-			Name:   networkName,
-			Driver: "bridge",
-		},
-	})
+	net, err := network.New(ctx)
 	require.NoError(t, err)
 	defer func() {
-		require.NoError(t, network.Remove(ctx))
+		require.NoError(t, net.Remove(ctx))
 	}()
 
 	// Start Pyroscope
-	pyroscopeC := startPyroscope(t, ctx, networkName)
+	pyroscopeC := startPyroscope(t, ctx, net)
 	defer func() {
 		require.NoError(t, pyroscopeC.Terminate(ctx))
 	}()
@@ -313,7 +305,7 @@ func TestOtelExtension(t *testing.T) {
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
 	// Build and start otel-extension example
-	appC := startApp(t, ctx, root, "examples/with-otel-extension/Dockerfile", networkName, map[string]string{
+	appC := startApp(t, ctx, root, "examples/with-otel-extension/Dockerfile", net, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":    "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME":  "otel-extension-example",
 		"PYROSCOPE_FORMAT":            "jfr",
@@ -379,20 +371,14 @@ func TestOtelLibrary(t *testing.T) {
 	ensureJarsBuilt(t, root)
 
 	// Create network
-	networkName := "itest-otel-lib-" + fmt.Sprintf("%d", time.Now().UnixNano())
-	network, err := testcontainers.GenericNetwork(ctx, testcontainers.GenericNetworkRequest{
-		NetworkRequest: testcontainers.NetworkRequest{
-			Name:   networkName,
-			Driver: "bridge",
-		},
-	})
+	net, err := network.New(ctx)
 	require.NoError(t, err)
 	defer func() {
-		require.NoError(t, network.Remove(ctx))
+		require.NoError(t, net.Remove(ctx))
 	}()
 
 	// Start Pyroscope
-	pyroscopeC := startPyroscope(t, ctx, networkName)
+	pyroscopeC := startPyroscope(t, ctx, net)
 	defer func() {
 		require.NoError(t, pyroscopeC.Terminate(ctx))
 	}()
@@ -400,7 +386,7 @@ func TestOtelLibrary(t *testing.T) {
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
 	// Build and start otel-library example
-	appC := startApp(t, ctx, root, "examples/with-otel-library/Dockerfile", networkName, map[string]string{
+	appC := startApp(t, ctx, root, "examples/with-otel-library/Dockerfile", net, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":    "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME":  "otel-library-example",
 	})
