@@ -23,8 +23,7 @@ sourceSets {
 }
 
 dependencies {
-    // TODO revert: use local pyroscope.jar instead of Maven Central until new version is published
-    implementation files("${rootProject.projectDir}/pyroscope.jar")
+    implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
     compileOnly 'org.jetbrains:annotations:26.0.2'
 

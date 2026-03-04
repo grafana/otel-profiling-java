@@ -6,12 +6,9 @@
 FROM gradle:8.14.3-jdk17 AS builder
 WORKDIR /build
 
-# Copy build descriptor files and the local pyroscope agent jar
+# Copy build descriptor files and resolve dependencies first (improves layer caching)
 COPY examples/with-otel-extension-manual-start/build.gradle ./build.gradle
 COPY examples/with-otel-extension-manual-start/settings.gradle ./settings.gradle
-# Copy the locally-built pyroscope agent jar (not from Maven Central)
-RUN mkdir -p libs
-COPY pyroscope.jar ./libs/pyroscope.jar
 RUN gradle dependencies --no-daemon -q
 
 # Copy source and build the fat jar

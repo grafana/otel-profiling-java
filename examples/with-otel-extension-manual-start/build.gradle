@@ -17,9 +17,10 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
-    // Local build of pyroscope-java agent (not from Maven Central).
-    // The jar is copied into the Docker build context by the Dockerfile.
-    implementation files('libs/pyroscope.jar')
+    // Pyroscope Java agent used as a library to start profiling programmatically.
+    // The OTel extension (pyroscope-otel-javaagent-extension.jar) is loaded separately via -javaagent flags
+    // and discovers this running profiler via the system ClassLoader bridge.
+    implementation 'io.pyroscope:agent:2.4.0'
 }
 
 bootJar {
