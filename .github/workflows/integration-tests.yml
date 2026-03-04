@@ -1,0 +1,63 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - 'src/**'
+      - 'otel-extension/**'
+      - 'lib/**'
+      - 'itest/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - 'settings.gradle'
+      - '.github/workflows/integration-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - 'src/**'
+      - 'otel-extension/**'
+      - 'lib/**'
+      - 'itest/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - 'settings.gradle'
+      - '.github/workflows/integration-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-x64-small
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - TestOtelExtension
+          - TestOtelLibrary
+          - TestOtelExtensionManualStart
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: 'stable'
+          cache-dependency-path: itest/go.sum
+
+      - name: Build pyroscope-otel jars
+        run: ./gradlew :otel-extension:shadowJar :lib:jar --no-daemon
+
+      - name: Run ${{ matrix.test }}
+        run: cd itest && go test -v -timeout 20m -count=1 -run ${{ matrix.test }} ./...

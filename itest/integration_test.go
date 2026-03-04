@@ -171,6 +171,10 @@ func extractSpanIDFromLogs(ctx context.Context, c testcontainers.Container) (str
 	return "", fmt.Errorf("span ID not found in container logs (log length: %d bytes)", len(logs))
 }
 
+func labelSelector(appName string) string {
+	return fmt.Sprintf(`{service_name="%s"}`, appName)
+}
+
 func querySpanPyroscopeProfile(t *testing.T, pyroscopeURL string, labelSelector string, span string) (string, error) {
 	t.Helper()
 	qc := querierv1connect.NewQuerierServiceClient(http.DefaultClient, pyroscopeURL)
@@ -200,7 +204,10 @@ func querySpanPyroscopeProfile(t *testing.T, pyroscopeURL string, labelSelector 
 	return string(buf.Bytes()), nil
 }
 
+const expectedFibonacciStack = ";java/lang/Thread.run;org/apache/tomcat/util/threads/TaskThread$WrappingRunnable.run;org/apache/tomcat/util/threads/ThreadPoolExecutor$Worker.run;org/apache/tomcat/util/threads/ThreadPoolExecutor.runWorker;org/apache/tomcat/util/net/SocketProcessorBase.run;org/apache/tomcat/util/net/NioEndpoint$SocketProcessor.doRun;org/apache/coyote/AbstractProtocol$ConnectionHandler.process;org/apache/coyote/AbstractProcessorLight.process;org/apache/coyote/http11/Http11Processor.service;org/apache/catalina/connector/CoyoteAdapter.service;org/apache/catalina/core/StandardEngineValve.invoke;org/apache/catalina/valves/ErrorReportValve.invoke;org/apache/catalina/core/StandardHostValve.invoke;org/apache/catalina/authenticator/AuthenticatorBase.invoke;org/apache/catalina/core/StandardContextValve.invoke;org/apache/catalina/core/StandardWrapperValve.invoke;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/CharacterEncodingFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/servlet/v3_1/OpenTelemetryHandlerMappingFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/FormContentFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/RequestContextFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/apache/tomcat/websocket/server/WsFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.service;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.doGet;org/springframework/web/servlet/FrameworkServlet.processRequest;org/springframework/web/servlet/DispatcherServlet.doService;org/springframework/web/servlet/DispatcherServlet.doDispatch;org/springframework/web/servlet/mvc/method/AbstractHandlerMethodAdapter.handle;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.handleInternal;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.invokeHandlerMethod;org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.invokeAndHandle;org/springframework/web/method/support/InvocableHandlerMethod.invokeForRequest;org/springframework/web/method/support/InvocableHandlerMethod.doInvoke;java/lang/reflect/Method.invoke;jdk/internal/reflect/DelegatingMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke0;io/pyroscope/example/WorkController.fibonacci;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute"
+
 func TestOtelExtension(t *testing.T) {
+	const appName = "otel-extension-example"
 	ctx := context.Background()
 	root := repoRoot()
 	ensureJarsBuilt(t, root)
@@ -221,9 +228,9 @@ func TestOtelExtension(t *testing.T) {
 
 	appC := startApp(t, ctx, root, "examples/with-otel-extension/Dockerfile", net, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
-		"PYROSCOPE_APPLICATION_NAME": "otel-extension-example",
+		"PYROSCOPE_APPLICATION_NAME": appName,
 		"PYROSCOPE_FORMAT":           "jfr",
-		"OTEL_SERVICE_NAME":          "otel-extension-example",
+		"OTEL_SERVICE_NAME":          appName,
 		"OTEL_TRACES_EXPORTER":       "logging",
 		"OTEL_LOGS_EXPORTER":         "none",
 		"OTEL_METRICS_EXPORTER":      "none",
@@ -248,13 +255,11 @@ func TestOtelExtension(t *testing.T) {
 
 	t.Logf("Extracted span ID from logs: %s", spanId)
 
-	const expected = ";java/lang/Thread.run;org/apache/tomcat/util/threads/TaskThread$WrappingRunnable.run;org/apache/tomcat/util/threads/ThreadPoolExecutor$Worker.run;org/apache/tomcat/util/threads/ThreadPoolExecutor.runWorker;org/apache/tomcat/util/net/SocketProcessorBase.run;org/apache/tomcat/util/net/NioEndpoint$SocketProcessor.doRun;org/apache/coyote/AbstractProtocol$ConnectionHandler.process;org/apache/coyote/AbstractProcessorLight.process;org/apache/coyote/http11/Http11Processor.service;org/apache/catalina/connector/CoyoteAdapter.service;org/apache/catalina/core/StandardEngineValve.invoke;org/apache/catalina/valves/ErrorReportValve.invoke;org/apache/catalina/core/StandardHostValve.invoke;org/apache/catalina/authenticator/AuthenticatorBase.invoke;org/apache/catalina/core/StandardContextValve.invoke;org/apache/catalina/core/StandardWrapperValve.invoke;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/CharacterEncodingFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/servlet/v3_1/OpenTelemetryHandlerMappingFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/FormContentFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/RequestContextFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/apache/tomcat/websocket/server/WsFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.service;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.doGet;org/springframework/web/servlet/FrameworkServlet.processRequest;org/springframework/web/servlet/DispatcherServlet.doService;org/springframework/web/servlet/DispatcherServlet.doDispatch;org/springframework/web/servlet/mvc/method/AbstractHandlerMethodAdapter.handle;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.handleInternal;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.invokeHandlerMethod;org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.invokeAndHandle;org/springframework/web/method/support/InvocableHandlerMethod.invokeForRequest;org/springframework/web/method/support/InvocableHandlerMethod.doInvoke;java/lang/reflect/Method.invoke;jdk/internal/reflect/DelegatingMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke0;io/pyroscope/example/WorkController.fibonacci;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute"
-
 	eventually(t, func() bool {
 		var collapsed string
 		collapsed, err = querySpanPyroscopeProfile(t, pyroscopeURL,
-			`{service_name="otel-extension-example"}`, spanId)
-		return err == nil && collapsed != "" && strings.Contains(collapsed, expected)
+			labelSelector(appName), spanId)
+		return err == nil && collapsed != "" && strings.Contains(collapsed, expectedFibonacciStack)
 	})
 }
 
@@ -263,6 +268,7 @@ func eventually(t *testing.T, condition func() bool) {
 }
 
 func TestOtelLibrary(t *testing.T) {
+	const appName = "otel-library-example"
 	ctx := context.Background()
 	root := repoRoot()
 	ensureJarsBuilt(t, root)
@@ -282,7 +288,7 @@ func TestOtelLibrary(t *testing.T) {
 
 	appC := startApp(t, ctx, root, "examples/with-otel-library/Dockerfile", net, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
-		"PYROSCOPE_APPLICATION_NAME": "otel-library-example",
+		"PYROSCOPE_APPLICATION_NAME": appName,
 	})
 	defer func() {
 		require.NoError(t, appC.Terminate(ctx))
@@ -298,12 +304,66 @@ func TestOtelLibrary(t *testing.T) {
 		return strings.Contains(lastBody, "fibonacci(40) = 102334155") && err == nil && spanId != ""
 	})
 
-	const expected = ";java/lang/Thread.run;org/apache/tomcat/util/threads/TaskThread$WrappingRunnable.run;org/apache/tomcat/util/threads/ThreadPoolExecutor$Worker.run;org/apache/tomcat/util/threads/ThreadPoolExecutor.runWorker;org/apache/tomcat/util/net/SocketProcessorBase.run;org/apache/tomcat/util/net/NioEndpoint$SocketProcessor.doRun;org/apache/coyote/AbstractProtocol$ConnectionHandler.process;org/apache/coyote/AbstractProcessorLight.process;org/apache/coyote/http11/Http11Processor.service;org/apache/catalina/connector/CoyoteAdapter.service;org/apache/catalina/core/StandardEngineValve.invoke;org/apache/catalina/valves/ErrorReportValve.invoke;org/apache/catalina/core/StandardHostValve.invoke;org/apache/catalina/authenticator/AuthenticatorBase.invoke;org/apache/catalina/core/StandardContextValve.invoke;org/apache/catalina/core/StandardWrapperValve.invoke;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/CharacterEncodingFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/FormContentFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/RequestContextFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/apache/tomcat/websocket/server/WsFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.service;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.doGet;org/springframework/web/servlet/FrameworkServlet.processRequest;org/springframework/web/servlet/DispatcherServlet.doService;org/springframework/web/servlet/DispatcherServlet.doDispatch;org/springframework/web/servlet/mvc/method/AbstractHandlerMethodAdapter.handle;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.handleInternal;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.invokeHandlerMethod;org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.invokeAndHandle;org/springframework/web/method/support/InvocableHandlerMethod.invokeForRequest;org/springframework/web/method/support/InvocableHandlerMethod.doInvoke;java/lang/reflect/Method.invoke;jdk/internal/reflect/DelegatingMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke0;io/pyroscope/example/WorkController.fibonacci;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute"
+	eventually(t, func() bool {
+		var collapsed string
+		collapsed, err = querySpanPyroscopeProfile(t, pyroscopeURL,
+			labelSelector(appName), spanId)
+		return err == nil && collapsed != "" && strings.Contains(collapsed, expectedFibonacciStack)
+	})
+}
+
+func TestOtelExtensionManualStart(t *testing.T) {
+	const appName = "otel-extension-manual-start-example"
+	ctx := context.Background()
+	root := repoRoot()
+	ensureJarsBuilt(t, root)
+
+	net, err := network.New(ctx)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, net.Remove(ctx))
+	}()
+
+	pyroscopeC := startPyroscope(t, ctx, net)
+	defer func() {
+		require.NoError(t, pyroscopeC.Terminate(ctx))
+	}()
+	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	t.Logf("Pyroscope URL: %s", pyroscopeURL)
+
+	appC := startApp(t, ctx, root, "examples/with-otel-extension-manual-start/Dockerfile", net, map[string]string{
+		"PYROSCOPE_SERVER_ADDRESS":      "http://pyroscope:4040",
+		"PYROSCOPE_APPLICATION_NAME":    appName,
+		"OTEL_SERVICE_NAME":             appName,
+		"OTEL_PYROSCOPE_START_PROFILING": "false",
+		"OTEL_TRACES_EXPORTER":          "logging",
+		"OTEL_LOGS_EXPORTER":            "none",
+		"OTEL_METRICS_EXPORTER":         "none",
+	})
+	defer func() {
+		require.NoError(t, appC.Terminate(ctx))
+	}()
+
+	appURL := getBaseURL(t, ctx, appC)
+	t.Logf("App URL: %s", appURL)
+
+	eventually(t, func() bool {
+		lastBody := requestFibonacci(t, appURL)
+		return strings.Contains(lastBody, "fibonacci(40) = 102334155")
+	})
+
+	var spanId string
+	eventually(t, func() bool {
+		spanId, err = extractSpanIDFromLogs(ctx, appC)
+		return err == nil && spanId != ""
+	})
+
+	t.Logf("Extracted span ID from logs: %s", spanId)
 
 	eventually(t, func() bool {
 		var collapsed string
 		collapsed, err = querySpanPyroscopeProfile(t, pyroscopeURL,
-			`{service_name="otel-library-example"}`, spanId)
-		return err == nil && collapsed != "" && strings.Contains(collapsed, expected)
+			labelSelector(appName), spanId)
+		return err == nil && collapsed != "" && strings.Contains(collapsed, expectedFibonacciStack)
 	})
 }
