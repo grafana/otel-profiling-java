@@ -3,6 +3,7 @@ package io.otel.pyroscope;
 
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
+import io.pyroscope.javaagent.ProfilerSdkFactory;
 import io.pyroscope.javaagent.api.ProfilerApi;
 import io.pyroscope.javaagent.api.ProfilerApiHolder;
 
@@ -20,6 +21,12 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
+            // Seed the holder with the embedded (relocated) ProfilerSdk as a safe fallback.
+            // This must happen before tryLoadFromSystemClassLoader() and startProfiling()
+            // because PyroscopeOtelSpanProcessor (whose static initializer also seeds) may
+            // not be loaded yet at this point.
+            ProfilerApiHolder.INSTANCE.compareAndSet(null, ProfilerSdkFactory.create());
+
             // Try to load ProfilerSdk from system classloader.
             // This handles the case where pyroscope-java is on the system classpath
             // (e.g., loaded as a -javaagent). The cast works because ProfilerApi
