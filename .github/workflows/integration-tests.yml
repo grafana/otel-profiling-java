@@ -35,10 +35,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test:
-          - TestOtelExtension
-          - TestOtelLibrary
-          - TestOtelExtensionManualStart
+        target:
+          - itest-otel-extension
+          - itest-otel-library
+          - itest-otel-extension-manual-start
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -56,8 +56,5 @@ jobs:
           go-version: 'stable'
           cache-dependency-path: itest/go.sum
 
-      - name: Build pyroscope-otel jars
-        run: ./gradlew :otel-extension:shadowJar :lib:jar --no-daemon
-
-      - name: Run ${{ matrix.test }}
-        run: cd itest && go test -v -timeout 20m -count=1 -run '^${{ matrix.test }}$' ./...
+      - name: Run ${{ matrix.target }}
+        run: make ${{ matrix.target }}
