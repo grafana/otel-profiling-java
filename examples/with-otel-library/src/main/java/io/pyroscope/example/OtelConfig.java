@@ -35,15 +35,13 @@ public class OtelConfig {
                         .build()
         );
 
-        // Pass null for profilerSdk: the thin pyroscope-otel.jar has no vendored dependencies,
-        // so PyroscopeOtelSpanProcessor uses the io.pyroscope classes directly from the same
-        // classloader as PyroscopeAgent above - no bridge needed.
+        // PyroscopeOtelSpanProcessor reads the active profiler from ProfilerApiHolder.INSTANCE,
+        // which was set by PyroscopeAgent.start() above (via ByteBuddy instrumentation hook).
         PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor(
                 new PyroscopeOtelConfiguration.Builder()
                         .setRootSpanOnly(true)
                         .setAddSpanName(true)
-                        .build(),
-                null
+                        .build()
         );
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
