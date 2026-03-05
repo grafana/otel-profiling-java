@@ -252,24 +252,6 @@ func eventuallyProfile(t *testing.T, pyroscopeURL string, appName string, spanId
 	}
 }
 
-func eventuallyProfileWithRequests(t *testing.T, pyroscopeURL string, appName string, spanId string, expectedStack string, appURL string) {
-	t.Helper()
-	var lastCollapsed string
-	var lastErr error
-	ok := assert.Eventually(t, func() bool {
-		// Send additional fibonacci requests to generate more profiling data
-		requestFibonacci(t, appURL)
-		lastCollapsed, lastErr = querySpanPyroscopeProfile(t, pyroscopeURL,
-			labelSelector(appName), spanId)
-		return lastErr == nil && lastCollapsed != "" && strings.Contains(lastCollapsed, expectedStack)
-	}, 2*time.Minute, 5*time.Second)
-	if !ok {
-		t.Logf("last profile query error: %v", lastErr)
-		t.Logf("last collapsed profile:\n%s", lastCollapsed)
-		t.FailNow()
-	}
-}
-
 func TestOtelLibrary(t *testing.T) {
 	const appName = "otel-library-example"
 	ctx := context.Background()
@@ -365,7 +347,7 @@ func TestOtelExtensionManualStart(t *testing.T) {
 	// Manual-start mode needs extra requests to generate profiling data because
 	// the profiler starts later (in @PostConstruct) than the OTel extension.
 	// Send additional requests while polling for the profile.
-	eventuallyProfileWithRequests(t, pyroscopeURL, appName, spanId, expected, appURL)
+	eventuallyProfile(t, pyroscopeURL, appName, spanId, expected, appURL)
 }
 
 func TestPyroscopeAgentFirst(t *testing.T) {
