@@ -32,7 +32,7 @@ jobs:
           git clone --depth 1 --branch vk/5c8d-merge-squash-the \
             https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
           cd /tmp/pyroscope-java
-          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc -x sign
+          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc -x signMavenPublication -x signShadowPublication
       # End TODO
       - name: Set up JDK
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
@@ -58,7 +58,7 @@ jobs:
           git clone --depth 1 --branch vk/5c8d-merge-squash-the \
             https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
           cd /tmp/pyroscope-java
-          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc -x sign
+          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc -x signMavenPublication -x signShadowPublication
       # End TODO
       - name: Set up JDK
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
