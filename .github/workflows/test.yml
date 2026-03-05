@@ -21,12 +21,25 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+      # TODO: Remove once bootstrap-api is published to Maven Central
+      - name: Set up JDK 17 for pyroscope-java build
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+      - name: Clone and publish pyroscope-java bootstrap-api to mavenLocal
+        run: |
+          git clone --depth 1 --branch vk/5c8d-merge-squash-the \
+            https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
+          cd /tmp/pyroscope-java
+          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc -x sign
+      # End TODO
       - name: Set up JDK
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           java-version: ${{ matrix.java }}
           distribution: 'zulu'
-      - run: ./gradlew test --stacktrace
+      - run: ./gradlew test --stacktrace -PuseMavenLocal
 
   build:
     runs-on: ubuntu-x64-small
@@ -34,9 +47,22 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+      # TODO: Remove once bootstrap-api is published to Maven Central
+      - name: Set up JDK 17 for pyroscope-java build
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+      - name: Clone and publish pyroscope-java bootstrap-api to mavenLocal
+        run: |
+          git clone --depth 1 --branch vk/5c8d-merge-squash-the \
+            https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
+          cd /tmp/pyroscope-java
+          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc -x sign
+      # End TODO
       - name: Set up JDK
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           java-version: '8'
           distribution: 'zulu'
-      - run: ./gradlew :otel-extension:shadowJar :lib:jar --stacktrace
+      - run: ./gradlew :otel-extension:shadowJar :lib:jar --stacktrace -PuseMavenLocal

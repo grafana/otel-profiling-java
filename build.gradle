@@ -28,7 +28,9 @@ subprojects {
     }
 
     repositories {
-        mavenLocal()
+        if (project.hasProperty('useMavenLocal')) {
+            mavenLocal()
+        }
         mavenCentral()
     }
 }
