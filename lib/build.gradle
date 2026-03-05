@@ -10,15 +10,7 @@ targetCompatibility = JavaVersion.VERSION_1_8
 sourceSets {
     main {
         java {
-            srcDirs = ["${rootProject.projectDir}/src/main/java"]
-        }
-        resources {
-            srcDirs = ["${rootProject.projectDir}/src/main/resources"]
-        }
-    }
-    test {
-        java {
-            srcDirs = ["${rootProject.projectDir}/src/test/java"]
+            srcDirs = ["${projectDir}/src/main/java"]
         }
     }
 }
@@ -27,24 +19,9 @@ dependencies {
     // Not vendored - declared as regular dependency, appears in the POM
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
-    // Included in the thin jar so ProfilerApi/ProfilerApiHolder are on the classpath
-    // when pyroscope-otel.jar is used as a library (no OTel agent, no bootstrap injection)
-    implementation project(':bootstrap-api')
-    compileOnly 'org.jetbrains:annotations:26.0.2'
-
-    compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
-    compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
-    compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
-
-    testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
-    testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
-    testImplementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
-    testImplementation("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
-
-    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.7.2'
-    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.7.2'
-    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.12.4'
-    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '3.12.4'
+    // OTel SDK classes (SpanProcessor, etc.) are provided transitively by io.pyroscope:agent.
+    // Users must also add the OTel SDK to their own dependencies.
+    compileOnly("io.opentelemetry:opentelemetry-sdk-trace:1.41.0")
 }
 
 // Tests run only in agent-extension since source is identical
@@ -57,9 +34,6 @@ java {
 
 jar {
     archiveFileName = "pyroscope-otel.jar"
-    // Include bootstrap-api classes directly so ProfilerApi/ProfilerApiHolder are available
-    // when pyroscope-otel.jar is used as a library (no OTel agent, no bootstrap injection)
-    from(project(':bootstrap-api').sourceSets.main.output)
 }
 
 publishing {

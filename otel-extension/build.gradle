@@ -9,15 +9,15 @@ targetCompatibility = JavaVersion.VERSION_1_8
 sourceSets {
     main {
         java {
-            srcDirs = ["${rootProject.projectDir}/src/main/java"]
+            srcDirs = ["${projectDir}/src/main/java"]
         }
         resources {
-            srcDirs = ["${rootProject.projectDir}/src/main/resources"]
+            srcDirs = ["${projectDir}/src/main/resources"]
         }
     }
     test {
         java {
-            srcDirs = ["${rootProject.projectDir}/src/test/java"]
+            srcDirs = ["${projectDir}/src/test/java"]
         }
     }
 }
