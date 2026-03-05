@@ -1,12 +1,29 @@
 # Build context: repository root (set in docker-compose.yml via `context: ..`)
 # Multi-stage build:
-#   Stage 0: Builds otel-extension from source
-#   Stage 1: Builds the example application
-#   Stage 2: Creates runtime image with both artifacts
+#   Stage 0: Builds pyroscope-java dependencies from source
+#   Stage 1: Builds otel-extension from source
+#   Stage 2: Builds the example application
+#   Stage 3: Creates runtime image with both artifacts
 
-# Stage 0: Build the otel-extension from source
+# Stage 0: Build pyroscope-java agent and bootstrap-api from source
+# TODO: Replace branch vk/5c8d-merge-squash-the with main once PR is merged
+FROM gradle:8.14.3-jdk17 AS pyroscope-builder
+WORKDIR /pyroscope-build
+
+# Clone pyroscope-java repository
+RUN git clone --depth 1 --branch vk/5c8d-merge-squash-the \
+    https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git .
+
+# Build and publish agent and bootstrap-api to local Maven repository
+RUN ./gradlew :agent:publishToMavenLocal :bootstrap-api:publishToMavenLocal --no-daemon -q
+
+
+# Stage 1: Build the otel-extension from source
 FROM gradle:8.14.3-jdk17 AS extension-builder
 WORKDIR /build
+
+# Copy Maven repository from pyroscope-builder stage
+COPY --from=pyroscope-builder /root/.m2/repository /root/.m2/repository
 
 # Copy Gradle wrapper (changes rarely - good for caching)
 COPY gradle/ ./gradle/
@@ -21,17 +38,17 @@ COPY build.gradle ./build.gradle
 # Copy otel-extension module configuration
 COPY otel-extension/build.gradle ./otel-extension/build.gradle
 
-# Resolve dependencies first (cached until build.gradle changes)
-RUN ./gradlew :otel-extension:dependencies --no-daemon -q
+# Resolve dependencies first using mavenLocal (cached until build.gradle changes)
+RUN ./gradlew :otel-extension:dependencies --no-daemon -q -PuseMavenLocal
 
 # Copy source code (changes frequently)
 COPY otel-extension/src/ ./otel-extension/src/
 
 # Build the shadow jar with all dependencies included
-RUN ./gradlew :otel-extension:shadowJar --no-daemon -q
+RUN ./gradlew :otel-extension:shadowJar --no-daemon -q -PuseMavenLocal
 
 
-# Stage 1: Build the example application
+# Stage 2: Build the example application
 # Use the official Gradle image so no Gradle distribution download is needed at build time.
 FROM gradle:8.14.3-jdk17 AS builder
 WORKDIR /build
@@ -46,7 +63,7 @@ COPY examples/with-otel-extension-manual-start/src ./src
 RUN gradle bootJar --no-daemon -q
 
 
-# Stage 2: Runtime image
+# Stage 3: Runtime image
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
