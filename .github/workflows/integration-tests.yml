@@ -56,15 +56,5 @@ jobs:
           go-version: 'stable'
           cache-dependency-path: itest/go.sum
 
-      # TODO: Remove once bootstrap-api is published to Maven Central
-      - name: Clone and publish pyroscope-java bootstrap-api to mavenLocal
-        run: |
-          git clone --depth 1 --branch vk/5c8d-merge-squash-the \
-            https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
-          cd /tmp/pyroscope-java
-          ./gradlew :bootstrap-api:publishToMavenLocal -x javadoc -x signMavenPublication
-
       - name: Run ${{ matrix.target }}
         run: make ${{ matrix.target }}
-        env:
-          ORG_GRADLE_PROJECT_useMavenLocal: true

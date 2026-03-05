@@ -41,20 +41,10 @@ jobs:
           java-version: '17'
           distribution: 'zulu'
 
-      # TODO: Remove once bootstrap-api is published to Maven Central
-      - name: Clone and publish pyroscope-java bootstrap-api to mavenLocal
-        run: |
-          git clone --depth 1 --branch vk/5c8d-merge-squash-the \
-            https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
-          cd /tmp/pyroscope-java
-          ./gradlew :bootstrap-api:publishToMavenLocal -x javadoc -x signMavenPublication
-
-      # Build both jars first - required by the example Dockerfiles.
-      # TODO: Remove this step once pyroscope-otel is published to Maven Central.
-      # - otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar  (shadow jar) used by the otel-extension and otel-extension-manual-start examples
-      # - lib/build/libs/pyroscope-otel.jar                 (thin jar)   used by the otel-library example
-      - name: Build pyroscope-otel jars
-        run: ./gradlew :otel-extension:shadowJar :lib:jar --no-daemon -PuseMavenLocal
+      # Build lib jar - required by the otel-library example Dockerfile
+      # The otel-extension examples build the extension from source in Docker
+      - name: Build lib jar for otel-library example
+        run: ./gradlew :lib:jar --no-daemon
 
       - name: Build otel-extension example Docker image
         run: |
