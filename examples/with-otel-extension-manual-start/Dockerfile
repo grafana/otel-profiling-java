@@ -24,7 +24,6 @@ COPY otel-extension/build.gradle ./otel-extension/build.gradle
 
 # Resolve dependencies first (cached until build.gradle changes)
 # Pyroscope artifacts are fetched from GitHub as a Maven repository
-RUN echo kek >> hui3
 RUN ./gradlew :otel-extension:dependencies --no-daemon -q
 
 # Copy source code (changes frequently)
