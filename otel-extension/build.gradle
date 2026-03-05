@@ -9,11 +9,6 @@ targetCompatibility = JavaVersion.VERSION_1_8
 dependencies {
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
-    // Bootstrap API classes — compileOnly so they're available at compile time but not bundled
-    // as a regular dependency. The jar is embedded as a resource and injected into the bootstrap
-    // classloader at runtime by BootstrapApiInjector.
-    compileOnly("io.pyroscope:bootstrap-api:${pyroscopeVersion}")
-
     compileOnly 'org.jetbrains:annotations:26.0.2'
 
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
@@ -23,7 +18,6 @@ dependencies {
     // Private API — used for appendToBootstrapClassLoaderSearch() to inject shared API classes.
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-bootstrap:${versions.opentelemetryJavaagentAlpha}")
 
-    testImplementation("io.pyroscope:bootstrap-api:${pyroscopeVersion}")
     testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
     testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     testImplementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
@@ -47,27 +41,7 @@ java {
     withSourcesJar()
 }
 
-// Resolve the bootstrap-api jar from Maven and copy it into the compiled resources directory
-// so it ends up in the shadow jar as a resource file. BootstrapApiInjector reads it via
-// getResourceAsStream() and injects it into the bootstrap classloader.
-// Renamed to .bin to prevent the shadow jar plugin from merging it.
-configurations {
-    bootstrapApi
-}
-
-dependencies {
-    bootstrapApi("io.pyroscope:bootstrap-api:${pyroscopeVersion}")
-}
-
-task copyBootstrapToResources(type: Copy) {
-    from configurations.bootstrapApi
-    into(sourceSets.main.output.resourcesDir)
-    rename '(.*)\\.jar', 'pyroscope-otel-bootstrap.jar.bin'
-}
-
 shadowJar {
-    dependsOn copyBootstrapToResources
-
     archiveFileName = "pyroscope-otel-javaagent-extension.jar"
     relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
         // Keep references to API classes unrelocated so they resolve from the bootstrap CL
@@ -77,7 +51,7 @@ shadowJar {
         exclude 'io.pyroscope.javaagent.api.ProfilerScopedContext'
     }
     // Exclude the API classes from the extension jar — they are injected into the bootstrap
-    // classloader at startup from the embedded pyroscope-otel-bootstrap.jar.bin resource.
+    // classloader at startup from the embedded pyroscope-bootstrap.jar.bin resource.
     exclude 'io/pyroscope/javaagent/api/ProfilerApi.class'
     exclude 'io/pyroscope/javaagent/api/ProfilerApiHolder.class'
     exclude 'io/pyroscope/javaagent/api/ProfilerScopedContext.class'

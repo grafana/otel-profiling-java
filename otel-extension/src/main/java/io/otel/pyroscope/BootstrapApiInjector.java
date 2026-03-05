@@ -40,21 +40,19 @@ class BootstrapApiInjector {
                 return;
             }
 
-            // Extract the embedded bootstrap jar from the extension jar's resources
-            // Resource uses .bin extension to prevent the shadow jar plugin from merging it
-            try (InputStream is = BootstrapApiInjector.class.getResourceAsStream("/pyroscope-otel-bootstrap.jar.bin")) {
+            // Extract the embedded bootstrap jar from the extension jar's resources.
+            // This resource originates from the pyroscope agent dependency and contains
+            // the 3 API classes (ProfilerApi, ProfilerApiHolder, ProfilerScopedContext).
+            // Resource uses .bin extension to prevent the shadow jar plugin from merging it.
+            try (InputStream is = BootstrapApiInjector.class.getResourceAsStream("/pyroscope-bootstrap.jar.bin")) {
                 if (is == null) {
-                    PyroscopeOtelDebug.log("BootstrapApiInjector: pyroscope-otel-bootstrap.jar.bin not found in resources, skipping");
+                    PyroscopeOtelDebug.log("BootstrapApiInjector: pyroscope-bootstrap.jar.bin not found in resources, skipping");
                     return;
                 }
-                Path tempJar = Files.createTempFile("pyroscope-otel-bootstrap-", ".jar");
+                Path tempJar = Files.createTempFile("pyroscope-bootstrap-", ".jar");
                 tempJar.toFile().deleteOnExit();
                 Files.copy(is, tempJar, StandardCopyOption.REPLACE_EXISTING);
 
-                // TODO: Instead of extracting a separate jar from resources, consider including
-                // the API classes directly in the extension jar and passing the extension jar
-                // itself here, using a JarFile subclass that filters entries to only return the
-                // three bootstrap-api classes. This would avoid the temp file extraction step.
                 instrumentation.appendToBootstrapClassLoaderSearch(new JarFile(tempJar.toFile()));
                 PyroscopeOtelDebug.log("BootstrapApiInjector: Injected API classes into bootstrap classloader");
             }

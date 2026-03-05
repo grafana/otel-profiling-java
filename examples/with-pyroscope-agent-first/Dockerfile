@@ -46,7 +46,7 @@ EXPOSE 8080
 # This means:
 #   1. PyroscopeAgent.premain() runs first — starts profiling immediately
 #   2. OTel agent starts second — loads the pyroscope-otel extension
-#   3. The extension injects bootstrap-api into bootstrap CL
+#   3. The extension injects bootstrap API classes into bootstrap CL
 #   4. The extension's ByteBuddy hook on PyroscopeAgent.start() never fires
 #      (start() was already called in premain)
 #   5. tryLoadFromSystemClassLoader() may still set ProfilerApiHolder.INSTANCE
