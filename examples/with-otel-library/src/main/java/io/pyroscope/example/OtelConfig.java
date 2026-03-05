@@ -2,7 +2,6 @@ package io.pyroscope.example;
 
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.otel.pyroscope.PyroscopeOtelConfiguration;
 import io.otel.pyroscope.PyroscopeOtelSpanProcessor;
 import io.pyroscope.http.Format;
 import io.pyroscope.javaagent.EventType;
@@ -35,14 +34,7 @@ public class OtelConfig {
                         .build()
         );
 
-        // PyroscopeOtelSpanProcessor reads the active profiler from ProfilerApiHolder.INSTANCE,
-        // which was set by PyroscopeAgent.start() above (via ByteBuddy instrumentation hook).
-        PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor(
-                new PyroscopeOtelConfiguration.Builder()
-                        .setRootSpanOnly(true)
-                        .setAddSpanName(true)
-                        .build()
-        );
+        PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor();
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
                 .addSpanProcessor(pyroscopeProcessor)

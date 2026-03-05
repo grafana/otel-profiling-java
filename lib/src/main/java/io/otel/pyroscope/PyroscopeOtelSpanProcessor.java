@@ -24,6 +24,14 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     private final PyroscopeOtelConfiguration configuration;
     private final AsyncProfiler asprof;
 
+    public PyroscopeOtelSpanProcessor() {
+        this(new PyroscopeOtelConfiguration.Builder().build());
+    }
+
+    /**
+     * @deprecated Use {@link #PyroscopeOtelSpanProcessor()} instead.
+     */
+    @Deprecated
     public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration) {
         this.configuration = configuration;
         this.asprof = PyroscopeAsyncProfiler.getAsyncProfiler();
