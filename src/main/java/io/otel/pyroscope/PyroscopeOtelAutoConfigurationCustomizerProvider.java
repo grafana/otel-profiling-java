@@ -20,6 +20,11 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
 
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
+        // Inject the shared API classes (ProfilerApi, ProfilerApiHolder, ProfilerScopedContext)
+        // into the bootstrap classloader BEFORE any code references them. This ensures all
+        // classloaders (extension CL, app CL) resolve the same class with the same static fields.
+        BootstrapApiInjector.ensureInjected();
+
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
             // Seed the holder with the embedded (relocated) ProfilerSdk as a safe fallback.
             // This must happen before tryLoadFromSystemClassLoader() and startProfiling()
