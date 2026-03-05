@@ -1,12 +1,12 @@
 package io.otel.pyroscope;
 
 
-/**
- * @deprecated Configuration is no longer needed. Use {@link io.otel.pyroscope.PyroscopeOtelSpanProcessor#PyroscopeOtelSpanProcessor()} instead.
- */
-@Deprecated
 public class PyroscopeOtelConfiguration {
+    /** @deprecated This field is no longer used. */
+    @Deprecated
     final boolean rootSpanOnly;
+    /** @deprecated This field is no longer used. */
+    @Deprecated
     final boolean addSpanName;
 
     private PyroscopeOtelConfiguration(Builder builder) {
@@ -22,35 +22,27 @@ public class PyroscopeOtelConfiguration {
                 '}';
     }
 
-    /**
-     * @deprecated Use {@link io.otel.pyroscope.PyroscopeOtelSpanProcessor#PyroscopeOtelSpanProcessor()} instead.
-     */
-    @Deprecated
     public static class Builder {
         boolean rootSpanOnly = true;
         boolean addSpanName = true;
 
-        /** @deprecated */
-        @Deprecated
         public Builder() {
         }
 
-        /** @deprecated */
+        /** @deprecated This setting is no longer used. */
         @Deprecated
         public Builder setRootSpanOnly(boolean rootSpanOnly) {
             this.rootSpanOnly = rootSpanOnly;
             return this;
         }
 
-        /** @deprecated */
+        /** @deprecated This setting is no longer used. */
         @Deprecated
         public Builder setAddSpanName(boolean addSpanName) {
             this.addSpanName = addSpanName;
             return this;
         }
 
-        /** @deprecated */
-        @Deprecated
         public PyroscopeOtelConfiguration build() {
             return new PyroscopeOtelConfiguration(this);
         }
