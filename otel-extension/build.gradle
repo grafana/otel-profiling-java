@@ -49,10 +49,11 @@ java {
 
 // Copy the bootstrap-api jar into the compiled resources directory so it ends up in the shadow jar
 // as a resource file. BootstrapApiInjector reads it via getResourceAsStream() and injects it into
-// the bootstrap classloader. The .bin extension prevents the shadow jar plugin from merging it.
+// the bootstrap classloader. Renamed to .bin to prevent the shadow jar plugin from merging it.
 task copyBootstrapToResources(type: Copy, dependsOn: ':bootstrap-api:jar') {
     from(project(':bootstrap-api').tasks.jar.archiveFile)
     into(sourceSets.main.output.resourcesDir)
+    rename '(.*)\\.jar', '$1.jar.bin'
 }
 
 shadowJar {
