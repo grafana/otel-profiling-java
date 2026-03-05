@@ -34,15 +34,18 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
         );
     }
 
+    // todo do not use  instrumentation at all, just put this hook into the pyroscope-java itself with a try-catch
+    // This class should have as little dependencies as possible, only ProfilerSdk and ProfilerApiHolder preferably
     @SuppressWarnings("unused")
     public static class StartAdvice {
 
         @Advice.OnMethodExit(suppress = Throwable.class)
         public static void onExit(@Advice.Origin Class<?> hookedClass) {
+            final boolean DEBUG = Boolean.getBoolean("pyroscope.otel.debug"); // do nott use PyroscopeOtelDebug
             try {
                 ClassLoader cl = hookedClass.getClassLoader();
-                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: PyroscopeAgent.start() hooked!");
-                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
+                if (DEBUG) System.out.println("Instrumentation: PyroscopeAgent.start() hooked!");
+                if (DEBUG) System.out.println("Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
 
                 // Constructed at runtime to avoid shadow jar string relocation
                 String implClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
@@ -56,9 +59,13 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
                 io.pyroscope.javaagent.api.ProfilerApi bridge =
                     (io.pyroscope.javaagent.api.ProfilerApi) ctor.newInstance();
                 io.pyroscope.javaagent.api.ProfilerApiHolder.INSTANCE.set(bridge);
-                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: Set ProfilerApiHolder.INSTANCE from " + cl.getClass().getName());
+                if (DEBUG) System.out.println("Instrumentation: Set ProfilerApiHolder.INSTANCE from " + cl.getClass().getName());
             } catch (Exception e) {
-                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: FAILED to hook ProfilerSdk: " + e, e);
+                if (DEBUG) e.printStackTrace(System.out);
+                if (DEBUG) System.out.println("Instrumentation: FAILED to hook ProfilerSdk: " + e);
+            } catch (Throwable e) {
+                if (DEBUG) e.printStackTrace(System.out);
+                if (DEBUG) System.out.println("Instrumentation: FAILED to hook ProfilerSdk: " + e);
             }
         }
     }
