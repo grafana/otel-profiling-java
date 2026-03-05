@@ -57,29 +57,30 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
     private static void tryLoadFromSystemClassLoader() {
         try {
             ClassLoader systemCL = ClassLoader.getSystemClassLoader();
-            System.out.println("[pyroscope-otel] AutoConfig: Trying to load ProfilerSdk from system classloader: " + systemCL);
-            System.out.println("[pyroscope-otel] AutoConfig: System classloader class: " + systemCL.getClass().getName());
+            PyroscopeOtelDebug.log("AutoConfig: Trying to load ProfilerSdk from system classloader: " + systemCL);
+            PyroscopeOtelDebug.log("AutoConfig: System classloader class: " + systemCL.getClass().getName());
             // Constructed at runtime so the shadow jar relocator doesn't rename it
             String className = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
-            System.out.println("[pyroscope-otel] AutoConfig: Loading class: " + className);
+            PyroscopeOtelDebug.log("AutoConfig: Loading class: " + className);
             Class<?> sdkClass = systemCL.loadClass(className);
-            System.out.println("[pyroscope-otel] AutoConfig: Loaded ProfilerSdk, classloader: " + sdkClass.getClassLoader());
+            PyroscopeOtelDebug.log("AutoConfig: Loaded ProfilerSdk, classloader: " + sdkClass.getClassLoader());
             Constructor<?> ctor = sdkClass.getDeclaredConstructor();
             ctor.setAccessible(true);
             ProfilerApi bridge = (ProfilerApi) ctor.newInstance();
-            System.out.println("[pyroscope-otel] AutoConfig: Cast to ProfilerApi succeeded! Using system-classloader ProfilerSdk.");
+            PyroscopeOtelDebug.log("AutoConfig: Cast to ProfilerApi succeeded! Using system-classloader ProfilerSdk.");
             ProfilerApiHolder.INSTANCE.set(bridge);
         } catch (Exception e) {
-            System.out.println("[pyroscope-otel] AutoConfig: Could not load ProfilerSdk from system classloader, will continue with the built-in one!");
-            System.out.println("  Reason: " + e.getMessage());
-            ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-            if (systemClassLoader instanceof URLClassLoader) {
-                System.out.println("  JARs visible to system classloader:");
-                for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
-                    System.out.println("    " + url);
+            PyroscopeOtelDebug.log("AutoConfig: Could not load ProfilerSdk from system classloader, will continue with the built-in one: " + e.getMessage());
+            if (PyroscopeOtelDebug.DEBUG) {
+                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+                if (systemClassLoader instanceof URLClassLoader) {
+                    PyroscopeOtelDebug.log("  JARs visible to system classloader:");
+                    for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
+                        PyroscopeOtelDebug.log("    " + url);
+                    }
+                } else {
+                    PyroscopeOtelDebug.log("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
                 }
-            } else {
-                System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
             }
         }
     }

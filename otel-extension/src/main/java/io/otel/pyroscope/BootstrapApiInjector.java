@@ -36,7 +36,7 @@ class BootstrapApiInjector {
         try {
             Instrumentation instrumentation = InstrumentationHolder.getInstrumentation();
             if (instrumentation == null) {
-                System.out.println("[pyroscope-otel] BootstrapApiInjector: Instrumentation not available, skipping bootstrap injection");
+                PyroscopeOtelDebug.log("BootstrapApiInjector: Instrumentation not available, skipping bootstrap injection");
                 return;
             }
 
@@ -44,7 +44,7 @@ class BootstrapApiInjector {
             // Resource uses .bin extension to prevent the shadow jar plugin from merging it
             try (InputStream is = BootstrapApiInjector.class.getResourceAsStream("/pyroscope-otel-bootstrap.jar.bin")) {
                 if (is == null) {
-                    System.out.println("[pyroscope-otel] BootstrapApiInjector: pyroscope-otel-bootstrap.jar.bin not found in resources, skipping");
+                    PyroscopeOtelDebug.log("BootstrapApiInjector: pyroscope-otel-bootstrap.jar.bin not found in resources, skipping");
                     return;
                 }
                 Path tempJar = Files.createTempFile("pyroscope-otel-bootstrap-", ".jar");
@@ -52,10 +52,10 @@ class BootstrapApiInjector {
                 Files.copy(is, tempJar, StandardCopyOption.REPLACE_EXISTING);
 
                 instrumentation.appendToBootstrapClassLoaderSearch(new JarFile(tempJar.toFile()));
-                System.out.println("[pyroscope-otel] BootstrapApiInjector: Injected API classes into bootstrap classloader");
+                PyroscopeOtelDebug.log("BootstrapApiInjector: Injected API classes into bootstrap classloader");
             }
         } catch (IOException e) {
-            System.out.println("[pyroscope-otel] BootstrapApiInjector: Failed to inject: " + e.getMessage());
+            PyroscopeOtelDebug.log("BootstrapApiInjector: Failed to inject: " + e.getMessage(), e);
         }
     }
 

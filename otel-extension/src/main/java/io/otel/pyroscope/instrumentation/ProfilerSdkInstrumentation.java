@@ -41,8 +41,8 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
         public static void onExit(@Advice.Origin Class<?> hookedClass) {
             try {
                 ClassLoader cl = hookedClass.getClassLoader();
-                System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent.start() hooked!");
-                System.out.println("[pyroscope-otel] Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
+                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: PyroscopeAgent.start() hooked!");
+                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
 
                 // Constructed at runtime to avoid shadow jar string relocation
                 String implClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
@@ -51,15 +51,14 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
                 Class<?> implClass = cl.loadClass(implClassName);
                 java.lang.reflect.Constructor<?> ctor = implClass.getDeclaredConstructor();
                 ctor.setAccessible(true);
-                // Cast to ProfilerApi — works because both ProfilerSdk and this advice
-                // code resolve ProfilerApi from the same classloader (app CL, where it was injected).
+                // Cast to ProfilerApi — works because both this advice code and ProfilerSdk
+                // resolve ProfilerApi from the bootstrap classloader (where it was injected).
                 io.pyroscope.javaagent.api.ProfilerApi bridge =
                     (io.pyroscope.javaagent.api.ProfilerApi) ctor.newInstance();
                 io.pyroscope.javaagent.api.ProfilerApiHolder.INSTANCE.set(bridge);
-                System.out.println("[pyroscope-otel] Instrumentation: Set ProfilerApiHolder.INSTANCE from " + cl.getClass().getName());
+                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: Set ProfilerApiHolder.INSTANCE from " + cl.getClass().getName());
             } catch (Exception e) {
-                System.out.println("[pyroscope-otel] Instrumentation: FAILED to hook ProfilerSdk: " + e);
-                e.printStackTrace();
+                io.otel.pyroscope.PyroscopeOtelDebug.log("Instrumentation: FAILED to hook ProfilerSdk: " + e, e);
             }
         }
     }
