@@ -11,6 +11,11 @@ sourceCompatibility = JavaVersion.VERSION_11
 targetCompatibility = JavaVersion.VERSION_11
 
 repositories {
+    // Use GitHub as a Maven repository for pyroscope-java artifacts
+    // TODO: Replace branch vk/5c8d-merge-squash-the with main once PR is merged
+    maven {
+        url = uri("https://raw.githubusercontent.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java/vk/5c8d-merge-squash-the/maven-repo")
+    }
     mavenCentral()
 }
 
@@ -18,9 +23,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
     // Pyroscope Java agent used as a library (not as a -javaagent) to start profiling programmatically.
-    // TODO: io.pyroscope:agent is not yet published to Maven Central. Once published,
-    //       confirm the version matches gradle.properties in the repo root (currently 2.4.0).
-    implementation 'io.pyroscope:agent:2.4.0'
+    // Fetched from GitHub Maven repository (see repositories block above)
+    implementation 'io.pyroscope:agent:2.5.0'
 
     // OpenTelemetry SDK for manual tracer/span creation
     implementation "io.opentelemetry:opentelemetry-sdk:1.44.1"
