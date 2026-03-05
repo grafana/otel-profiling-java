@@ -34,31 +34,6 @@ func repoRoot() string {
 	return filepath.Dir(filepath.Dir(filename))
 }
 
-func ensureJarsBuilt(t *testing.T, root string) {
-	t.Helper()
-	t.Logf("root %s", root)
-	jars := []string{
-		filepath.Join(root, "otel-extension", "build", "libs", "pyroscope-otel-javaagent-extension.jar"),
-		filepath.Join(root, "lib", "build", "libs", "pyroscope-otel.jar"),
-	}
-	allExist := true
-	for _, jar := range jars {
-		if _, err := os.Stat(jar); os.IsNotExist(err) {
-			allExist = false
-			break
-		}
-	}
-	if allExist {
-		return
-	}
-	t.Log("Pre-built JARs not found, running ./gradlew :otel-extension:shadowJar :lib:jar ...")
-	cmd := exec.Command("./gradlew", ":otel-extension:shadowJar", ":lib:jar")
-	cmd.Dir = root
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	require.NoError(t, cmd.Run(), "gradle build failed")
-}
-
 func startPyroscope(t *testing.T, ctx context.Context, net *testcontainers.DockerNetwork) testcontainers.Container {
 	t.Helper()
 	t.Logf("starting pyroscope...")
@@ -209,7 +184,6 @@ func TestOtelExtension(t *testing.T) {
 	const appName = "otel-extension-example"
 	ctx := context.Background()
 	root := repoRoot()
-	ensureJarsBuilt(t, root)
 
 	// Create network
 	net, err := network.New(ctx)
@@ -302,7 +276,6 @@ func TestOtelLibrary(t *testing.T) {
 	const appName = "otel-library-example"
 	ctx := context.Background()
 	root := repoRoot()
-	ensureJarsBuilt(t, root)
 
 	net, err := network.New(ctx)
 	require.NoError(t, err)
@@ -345,7 +318,6 @@ func TestOtelExtensionManualStart(t *testing.T) {
 	const appName = "otel-extension-manual-start-example"
 	ctx := context.Background()
 	root := repoRoot()
-	ensureJarsBuilt(t, root)
 
 	net, err := network.New(ctx)
 	require.NoError(t, err)
@@ -402,7 +374,6 @@ func TestPyroscopeAgentFirst(t *testing.T) {
 	const appName = "pyroscope-agent-first-test"
 	ctx := context.Background()
 	root := repoRoot()
-	ensureJarsBuilt(t, root)
 
 	net, err := network.New(ctx)
 	require.NoError(t, err)
