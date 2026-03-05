@@ -1,4 +1,3 @@
 rootProject.name = 'otel-profiling-java'
-include 'bootstrap-api'
 include 'otel-extension'
 include 'lib'

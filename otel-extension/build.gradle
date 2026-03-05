@@ -12,7 +12,7 @@ dependencies {
     // Bootstrap API classes — compileOnly so they're available at compile time but not bundled
     // as a regular dependency. The jar is embedded as a resource and injected into the bootstrap
     // classloader at runtime by BootstrapApiInjector.
-    compileOnly project(':bootstrap-api')
+    compileOnly("io.pyroscope:bootstrap-api:${pyroscopeVersion}")
 
     compileOnly 'org.jetbrains:annotations:26.0.2'
 
@@ -23,7 +23,7 @@ dependencies {
     // Private API — used for appendToBootstrapClassLoaderSearch() to inject shared API classes.
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-bootstrap:${versions.opentelemetryJavaagentAlpha}")
 
-    testImplementation project(':bootstrap-api')
+    testImplementation("io.pyroscope:bootstrap-api:${pyroscopeVersion}")
     testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
     testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     testImplementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
@@ -47,13 +47,22 @@ java {
     withSourcesJar()
 }
 
-// Copy the bootstrap-api jar into the compiled resources directory so it ends up in the shadow jar
-// as a resource file. BootstrapApiInjector reads it via getResourceAsStream() and injects it into
-// the bootstrap classloader. Renamed to .bin to prevent the shadow jar plugin from merging it.
-task copyBootstrapToResources(type: Copy, dependsOn: ':bootstrap-api:jar') {
-    from(project(':bootstrap-api').tasks.jar.archiveFile)
+// Resolve the bootstrap-api jar from Maven and copy it into the compiled resources directory
+// so it ends up in the shadow jar as a resource file. BootstrapApiInjector reads it via
+// getResourceAsStream() and injects it into the bootstrap classloader.
+// Renamed to .bin to prevent the shadow jar plugin from merging it.
+configurations {
+    bootstrapApi
+}
+
+dependencies {
+    bootstrapApi("io.pyroscope:bootstrap-api:${pyroscopeVersion}")
+}
+
+task copyBootstrapToResources(type: Copy) {
+    from configurations.bootstrapApi
     into(sourceSets.main.output.resourcesDir)
-    rename '(.*)\\.jar', '$1.jar.bin'
+    rename '(.*)\\.jar', 'pyroscope-otel-bootstrap.jar.bin'
 }
 
 shadowJar {
