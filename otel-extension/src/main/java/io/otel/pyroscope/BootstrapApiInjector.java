@@ -1,5 +1,7 @@
 package io.otel.pyroscope;
 
+import io.opentelemetry.javaagent.bootstrap.InstrumentationHolder;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.instrument.Instrumentation;
@@ -32,7 +34,7 @@ class BootstrapApiInjector {
 
     private static void inject() {
         try {
-            Instrumentation instrumentation = getInstrumentation();
+            Instrumentation instrumentation = InstrumentationHolder.getInstrumentation();
             if (instrumentation == null) {
                 System.out.println("[pyroscope-otel] BootstrapApiInjector: Instrumentation not available, skipping bootstrap injection");
                 return;
@@ -57,18 +59,4 @@ class BootstrapApiInjector {
         }
     }
 
-    /**
-     * Access the Instrumentation instance via OTel's InstrumentationHolder (private API).
-     * Uses reflection to avoid a hard compile-time dependency on the bootstrap module.
-     */
-    private static Instrumentation getInstrumentation() {
-        try {
-            Class<?> holderClass = Class.forName("io.opentelemetry.javaagent.bootstrap.InstrumentationHolder");
-            java.lang.reflect.Method getter = holderClass.getDeclaredMethod("getInstrumentation");
-            return (Instrumentation) getter.invoke(null);
-        } catch (Exception e) {
-            System.out.println("[pyroscope-otel] BootstrapApiInjector: Could not access InstrumentationHolder: " + e.getMessage());
-            return null;
-        }
-    }
 }
