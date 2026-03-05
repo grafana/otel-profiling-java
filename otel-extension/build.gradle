@@ -6,22 +6,6 @@ plugins {
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
-sourceSets {
-    main {
-        java {
-            srcDirs = ["${projectDir}/src/main/java"]
-        }
-        resources {
-            srcDirs = ["${projectDir}/src/main/resources"]
-        }
-    }
-    test {
-        java {
-            srcDirs = ["${projectDir}/src/test/java"]
-        }
-    }
-}
-
 dependencies {
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 

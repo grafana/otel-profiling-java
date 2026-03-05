@@ -7,14 +7,6 @@ plugins {
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
-sourceSets {
-    main {
-        java {
-            srcDirs = ["${projectDir}/src/main/java"]
-        }
-    }
-}
-
 dependencies {
     // Not vendored - declared as regular dependency, appears in the POM
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
