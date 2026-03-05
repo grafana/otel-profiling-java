@@ -5,7 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.function.BiConsumer;
 
 /**
- * Injected into the app classloader by the OTel extension's InstrumentationModule.
+ * Injected into the bootstrap classloader by the OTel extension at startup.
  * This interface MUST be kept in sync with the copy in pyroscope-java (same package, same
  * method signatures) — do not modify without updating both repos.
  *

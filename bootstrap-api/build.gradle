@@ -1,0 +1,17 @@
+plugins {
+    id 'java-library'
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+dependencies {
+    compileOnly 'org.jetbrains:annotations:26.0.2'
+}
+
+jar {
+    // Use .bin extension so the shadow jar plugin in otel-extension doesn't
+    // treat this jar as a dependency to merge (it would extract its contents).
+    // BootstrapApiInjector reads it as a resource and writes it to a temp .jar file.
+    archiveFileName = "pyroscope-otel-bootstrap.jar.bin"
+}

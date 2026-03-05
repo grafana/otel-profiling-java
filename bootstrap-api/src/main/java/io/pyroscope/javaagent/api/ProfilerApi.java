@@ -5,8 +5,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Map;
 
 /**
- * Shared profiling interface injected into the app classloader by the OTel extension's
- * InstrumentationModule. This interface MUST be kept in sync with the copy in pyroscope-java
+ * Shared profiling interface injected into the bootstrap classloader by the OTel extension.
+ * This interface MUST be kept in sync with the copy in pyroscope-java
  * (same package, same method signatures) — the JVM must consider them the same type across
  * classloaders for the cross-classloader cast to work. Do not modify without updating both repos.
  *

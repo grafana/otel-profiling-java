@@ -25,6 +25,11 @@ sourceSets {
 dependencies {
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
+    // Bootstrap API classes — compileOnly so they're available at compile time but not bundled
+    // as a regular dependency. The jar is embedded as a resource and injected into the bootstrap
+    // classloader at runtime by BootstrapApiInjector.
+    compileOnly project(':bootstrap-api')
+
     compileOnly 'org.jetbrains:annotations:26.0.2'
 
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
@@ -32,9 +37,9 @@ dependencies {
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
 
     // Private API — used for appendToBootstrapClassLoaderSearch() to inject shared API classes.
-    // This is the OTel-recommended approach for sharing state between extension and app classloaders.
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-bootstrap:${versions.opentelemetryJavaagentAlpha}")
 
+    testImplementation project(':bootstrap-api')
     testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
     testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     testImplementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
@@ -58,27 +63,11 @@ java {
     withSourcesJar()
 }
 
-// Build a small jar containing only the shared API classes for bootstrap CL injection.
-// These classes must be on the bootstrap classloader so that both the ExtensionClassLoader
-// (where the span processor runs) and the app classloader (where the ByteBuddy advice runs)
-// resolve the SAME ProfilerApiHolder class with the SAME static AtomicReference field.
-task bootstrapJar(type: Jar, dependsOn: compileJava) {
-    // Use .bin extension so the shadow jar plugin doesn't treat it as a dependency to merge.
-    // BootstrapApiInjector renames it to .jar when extracting to a temp file.
-    archiveFileName = "pyroscope-otel-bootstrap.jar.bin"
-    destinationDirectory = file("${buildDir}/bootstrap")
-    from(compileJava.destinationDirectory) {
-        include 'io/pyroscope/javaagent/api/ProfilerApi.class'
-        include 'io/pyroscope/javaagent/api/ProfilerApiHolder.class'
-        include 'io/pyroscope/javaagent/api/ProfilerScopedContext.class'
-    }
-}
-
-// Copy the bootstrap jar into the compiled resources directory so it ends up in the shadow jar
-// as a resource file (not expanded). BootstrapApiInjector reads it via
-// getResourceAsStream("/pyroscope-otel-bootstrap.jar").
-task copyBootstrapToResources(type: Copy, dependsOn: bootstrapJar) {
-    from("${buildDir}/bootstrap/pyroscope-otel-bootstrap.jar.bin")
+// Copy the bootstrap-api jar into the compiled resources directory so it ends up in the shadow jar
+// as a resource file. BootstrapApiInjector reads it via getResourceAsStream() and injects it into
+// the bootstrap classloader. The .bin extension prevents the shadow jar plugin from merging it.
+task copyBootstrapToResources(type: Copy, dependsOn: ':bootstrap-api:jar') {
+    from(project(':bootstrap-api').tasks.jar.archiveFile)
     into(sourceSets.main.output.resourcesDir)
 }
 
@@ -94,7 +83,7 @@ shadowJar {
         exclude 'io.pyroscope.javaagent.api.ProfilerScopedContext'
     }
     // Exclude the API classes from the extension jar — they are injected into the bootstrap
-    // classloader at startup from the embedded pyroscope-otel-bootstrap.jar resource.
+    // classloader at startup from the embedded pyroscope-otel-bootstrap.jar.bin resource.
     exclude 'io/pyroscope/javaagent/api/ProfilerApi.class'
     exclude 'io/pyroscope/javaagent/api/ProfilerApiHolder.class'
     exclude 'io/pyroscope/javaagent/api/ProfilerScopedContext.class'

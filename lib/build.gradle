@@ -27,6 +27,9 @@ dependencies {
     // Not vendored - declared as regular dependency, appears in the POM
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
+    // Included in the thin jar so ProfilerApi/ProfilerApiHolder are on the classpath
+    // when pyroscope-otel.jar is used as a library (no OTel agent, no bootstrap injection)
+    implementation project(':bootstrap-api')
     compileOnly 'org.jetbrains:annotations:26.0.2'
 
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
@@ -54,6 +57,9 @@ java {
 
 jar {
     archiveFileName = "pyroscope-otel.jar"
+    // Include bootstrap-api classes directly so ProfilerApi/ProfilerApiHolder are available
+    // when pyroscope-otel.jar is used as a library (no OTel agent, no bootstrap injection)
+    from(project(':bootstrap-api').sourceSets.main.output)
 }
 
 publishing {
