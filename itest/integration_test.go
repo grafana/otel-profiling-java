@@ -347,7 +347,7 @@ func TestOtelExtensionManualStart(t *testing.T) {
 	// Manual-start mode needs extra requests to generate profiling data because
 	// the profiler starts later (in @PostConstruct) than the OTel extension.
 	// Send additional requests while polling for the profile.
-	eventuallyProfile(t, pyroscopeURL, appName, spanId, expected, appURL)
+	eventuallyProfile(t, pyroscopeURL, appName, spanId, expected)
 }
 
 func TestPyroscopeAgentFirst(t *testing.T) {
