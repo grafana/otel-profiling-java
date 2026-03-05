@@ -59,17 +59,6 @@ func ensureJarsBuilt(t *testing.T, root string) {
 	require.NoError(t, cmd.Run(), "gradle build failed")
 }
 
-func ensurePyroscopeAgentJar(t *testing.T, root string) {
-	t.Helper()
-	dst := filepath.Join(root, "pyroscope-agent.jar")
-	if _, err := os.Stat(dst); err == nil {
-		return
-	}
-	t.Fatal("pyroscope-agent.jar not found in repo root. Build it from pyroscope-java and copy:\n" +
-		"  cd ../pyroscope-java && ./gradlew :agent:shadowJar\n" +
-		"  cp ../pyroscope-java/agent/build/libs/pyroscope.jar " + dst)
-}
-
 func startPyroscope(t *testing.T, ctx context.Context, net *testcontainers.DockerNetwork) testcontainers.Container {
 	t.Helper()
 	t.Logf("starting pyroscope...")
@@ -409,21 +398,11 @@ func TestOtelExtensionManualStart(t *testing.T) {
 	eventuallyProfileWithRequests(t, pyroscopeURL, appName, spanId, expected, appURL)
 }
 
-// TestPyroscopeAgentFirst tests the (unsupported) configuration where pyroscope.jar
-// is loaded as -javaagent BEFORE the OTel Java agent. In this scenario:
-//   - PyroscopeAgent.premain() runs first and starts profiling immediately
-//   - The OTel agent starts second and loads the pyroscope-otel extension
-//   - The extension's ByteBuddy hook on PyroscopeAgent.start() never fires (already called)
-//   - tryLoadFromSystemClassLoader() still sets ProfilerApiHolder.INSTANCE
-//   - The extension attempts startProfiling() which logs "already started" (harmless)
-//
-// This test verifies that span-profile correlation still works in this scenario.
 func TestPyroscopeAgentFirst(t *testing.T) {
 	const appName = "pyroscope-agent-first-test"
 	ctx := context.Background()
 	root := repoRoot()
 	ensureJarsBuilt(t, root)
-	ensurePyroscopeAgentJar(t, root)
 
 	net, err := network.New(ctx)
 	require.NoError(t, err)
