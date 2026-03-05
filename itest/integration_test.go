@@ -175,7 +175,7 @@ func querySpanPyroscopeProfile(t *testing.T, pyroscopeURL string, labelSelector 
 	}
 	buf := bytes.NewBuffer(nil)
 	tt.WriteCollapsed(buf)
-	return string(buf.Bytes()), nil
+	return buf.String(), nil
 }
 
 func TestOtelExtension(t *testing.T) {
