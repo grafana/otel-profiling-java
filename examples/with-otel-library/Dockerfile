@@ -42,4 +42,4 @@ EXPOSE 8080
 # No -javaagent flags - Pyroscope and OTel are used as libraries bundled in app.jar.
 # Configuration is done via environment variables - see docker-compose.yml:
 #   PYROSCOPE_SERVER_ADDRESS, PYROSCOPE_APPLICATION_NAME
-CMD ["java", "-jar", "app.jar"]
+CMD ["java", "-Dpyroscope.otel.debug=true", "-jar", "app.jar"]

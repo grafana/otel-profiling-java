@@ -52,4 +52,5 @@ EXPOSE 8080
 CMD ["java", \
      "-javaagent:opentelemetry-javaagent.jar", \
      "-Dotel.javaagent.extensions=pyroscope-otel-javaagent-extension.jar", \
+     "-Dpyroscope.otel.debug=true", \
      "-jar", "app.jar"]
