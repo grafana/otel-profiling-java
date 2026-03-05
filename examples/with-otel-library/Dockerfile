@@ -9,6 +9,8 @@ WORKDIR /build
 # Copy build descriptor files and resolve dependencies first (improves layer caching)
 COPY examples/with-otel-library/build.gradle ./build.gradle
 COPY examples/with-otel-library/settings.gradle ./settings.gradle
+# Root gradle.properties provides pyroscope_version used in build.gradle
+COPY gradle.properties ./gradle.properties
 
 # TODO: This is temporary. Once pyroscope-otel is published to Maven Central,
 #       remove this COPY and replace the fileTree dependency in build.gradle with:

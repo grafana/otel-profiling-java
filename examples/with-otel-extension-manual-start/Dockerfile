@@ -42,6 +42,8 @@ WORKDIR /build
 # Copy build descriptor files and resolve dependencies first (improves layer caching)
 COPY examples/with-otel-extension-manual-start/build.gradle ./build.gradle
 COPY examples/with-otel-extension-manual-start/settings.gradle ./settings.gradle
+# Root gradle.properties provides pyroscope_version used in build.gradle
+COPY gradle.properties ./gradle.properties
 RUN gradle dependencies --no-daemon -q
 
 # Copy source and build the fat jar

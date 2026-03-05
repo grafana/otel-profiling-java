@@ -24,7 +24,8 @@ dependencies {
 
     // Pyroscope Java agent used as a library (not as a -javaagent) to start profiling programmatically.
     // Fetched from GitHub Maven repository (see repositories block above)
-    implementation 'io.pyroscope:agent:2.5.0'
+    // Version is defined in gradle.properties (pyroscope_version)
+    implementation "io.pyroscope:agent:${property('pyroscope_version')}"
 
     // OpenTelemetry SDK for manual tracer/span creation
     implementation "io.opentelemetry:opentelemetry-sdk:1.44.1"
