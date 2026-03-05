@@ -1,5 +1,35 @@
 # Build context: repository root (set in docker-compose.yml via `context: ..`)
-# This allows copying otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar built from the repo root.
+# Multi-stage build:
+#   Stage 0: Builds otel-extension from source
+#   Stage 1: Builds the example application
+#   Stage 2: Creates runtime image with both artifacts
+
+# Stage 0: Build the otel-extension from source
+FROM gradle:8.14.3-jdk17 AS extension-builder
+WORKDIR /build
+
+# Copy Gradle wrapper (changes rarely - good for caching)
+COPY gradle/ ./gradle/
+COPY gradlew ./gradlew
+COPY gradlew.bat ./gradlew.bat
+
+# Copy root project configuration (defines versions, group)
+COPY gradle.properties ./gradle.properties
+COPY settings.gradle ./settings.gradle
+COPY build.gradle ./build.gradle
+
+# Copy otel-extension module configuration
+COPY otel-extension/build.gradle ./otel-extension/build.gradle
+
+# Resolve dependencies first (cached until build.gradle changes)
+RUN ./gradlew :otel-extension:dependencies --no-daemon -q
+
+# Copy source code (changes frequently)
+COPY otel-extension/src/ ./otel-extension/src/
+
+# Build the shadow jar with all dependencies included
+RUN ./gradlew :otel-extension:shadowJar --no-daemon -q
+
 
 # Stage 1: Build the example application
 # Use the official Gradle image so no Gradle distribution download is needed at build time.
@@ -26,13 +56,8 @@ COPY --from=builder /build/build/libs/app.jar app.jar
 # Download the OpenTelemetry Java agent
 ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.15.0/opentelemetry-javaagent.jar opentelemetry-javaagent.jar
 
-# TODO: This is temporary. Once pyroscope-otel is published to Maven Central,
-#       replace this COPY with an ADD from the release URL, for example:
-#       ADD https://github.com/grafana/otel-profiling-java/releases/download/v1.1.0/pyroscope-otel-javaagent-extension.jar pyroscope-otel-javaagent-extension.jar
-#
-# For now, build the jar first from the repository root:
-#   ./gradlew :otel-extension:shadowJar
-COPY otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar pyroscope-otel-javaagent-extension.jar
+# Copy the built otel-extension from the builder stage
+COPY --from=extension-builder /build/otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar pyroscope-otel-javaagent-extension.jar
 
 EXPOSE 8080
 

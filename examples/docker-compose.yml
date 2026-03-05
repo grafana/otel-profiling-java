@@ -1,11 +1,11 @@
-# Prerequisites:
-#   1. Build the pyroscope-otel jars from the repository root:
-#      ./gradlew :otel-extension:shadowJar :lib:jar
-#   2. Then from this directory:
-#      docker-compose up --build
+# docker-compose.yml for otel-profiling-java examples
 #
-# TODO: Once pyroscope-otel is published to Maven Central, step 1 will no longer
-#       be required. The Dockerfiles will reference the published artifact directly.
+# The example Dockerfiles use multi-stage builds to compile the otel-extension from source.
+# No manual build steps are required - just run: docker-compose up
+#
+# Build context is set to repository root (..) to access:
+#   - otel-extension source and build files for compilation
+#   - Example app source and build files
 
 services:
   pyroscope:
@@ -28,7 +28,7 @@ services:
 
   otel-extension-example:
     build:
-      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
+      # Context is repo root for multi-stage build to compile otel-extension and example app
       context: ..
       dockerfile: examples/with-otel-extension/Dockerfile
     environment:
@@ -64,7 +64,7 @@ services:
 
   otel-extension-manual-start-example:
     build:
-      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
+      # Context is repo root for multi-stage build to compile otel-extension and example app
       context: ..
       dockerfile: examples/with-otel-extension-manual-start/Dockerfile
     environment:
