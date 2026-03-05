@@ -51,6 +51,10 @@ class BootstrapApiInjector {
                 tempJar.toFile().deleteOnExit();
                 Files.copy(is, tempJar, StandardCopyOption.REPLACE_EXISTING);
 
+                // TODO: Instead of extracting a separate jar from resources, consider including
+                // the API classes directly in the extension jar and passing the extension jar
+                // itself here, using a JarFile subclass that filters entries to only return the
+                // three bootstrap-api classes. This would avoid the temp file extraction step.
                 instrumentation.appendToBootstrapClassLoaderSearch(new JarFile(tempJar.toFile()));
                 PyroscopeOtelDebug.log("BootstrapApiInjector: Injected API classes into bootstrap classloader");
             }
