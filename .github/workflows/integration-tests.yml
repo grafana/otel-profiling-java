@@ -62,7 +62,7 @@ jobs:
           git clone --depth 1 --branch vk/5c8d-merge-squash-the \
             https://github.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java.git /tmp/pyroscope-java
           cd /tmp/pyroscope-java
-          ./gradlew :bootstrap-api:publishToMavenLocal :agent:publishToMavenLocal -x javadoc
+          ./gradlew :bootstrap-api:publishToMavenLocal -x javadoc -x signMavenPublication
 
       - name: Run ${{ matrix.target }}
         run: make ${{ matrix.target }}
