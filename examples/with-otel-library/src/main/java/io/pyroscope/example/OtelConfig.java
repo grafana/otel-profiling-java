@@ -2,7 +2,6 @@ package io.pyroscope.example;
 
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.otel.pyroscope.PyroscopeOtelConfiguration;
 import io.otel.pyroscope.PyroscopeOtelSpanProcessor;
 import io.pyroscope.http.Format;
 import io.pyroscope.javaagent.EventType;
@@ -35,16 +34,9 @@ public class OtelConfig {
                         .build()
         );
 
-        // Pass null for profilerSdk: the thin pyroscope-otel.jar has no vendored dependencies,
-        // so PyroscopeOtelSpanProcessor uses the io.pyroscope classes directly from the same
-        // classloader as PyroscopeAgent above - no bridge needed.
-        PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor(
-                new PyroscopeOtelConfiguration.Builder()
-                        .setRootSpanOnly(true)
-                        .setAddSpanName(true)
-                        .build(),
-                null
-        );
+        // The lib module uses the simplified SpanProcessor that calls io.pyroscope classes
+        // directly from the same classloader as PyroscopeAgent above - no bridge needed.
+        PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor();
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
                 .addSpanProcessor(pyroscopeProcessor)
