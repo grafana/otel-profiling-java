@@ -41,32 +41,7 @@ public class ProfilerSdkInstrumentation implements TypeInstrumentation {
 
         @Advice.OnMethodExit(suppress = Throwable.class)
         public static void onExit(@Advice.Origin Class<?> hookedClass) {
-            final boolean DEBUG = Boolean.getBoolean("pyroscope.otel.debug"); // do nott use PyroscopeOtelDebug
-            try {
-                ClassLoader cl = hookedClass.getClassLoader();
-                if (DEBUG) System.out.println("Instrumentation: PyroscopeAgent.start() hooked!");
-                if (DEBUG) System.out.println("Instrumentation: PyroscopeAgent classloader: " + cl.getClass().getName());
 
-                // Constructed at runtime to avoid shadow jar string relocation
-                String implClassName = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
-
-                // Load and instantiate ProfilerSdk from the app classloader.
-                Class<?> implClass = cl.loadClass(implClassName);
-                java.lang.reflect.Constructor<?> ctor = implClass.getDeclaredConstructor();
-                ctor.setAccessible(true);
-                // Cast to ProfilerApi — works because both this advice code and ProfilerSdk
-                // resolve ProfilerApi from the bootstrap classloader (where it was injected).
-                io.pyroscope.javaagent.api.ProfilerApi bridge =
-                    (io.pyroscope.javaagent.api.ProfilerApi) ctor.newInstance();
-                io.pyroscope.javaagent.api.ProfilerApiHolder.INSTANCE.set(bridge);
-                if (DEBUG) System.out.println("Instrumentation: Set ProfilerApiHolder.INSTANCE from " + cl.getClass().getName());
-            } catch (Exception e) {
-                if (DEBUG) e.printStackTrace(System.out);
-                if (DEBUG) System.out.println("Instrumentation: FAILED to hook ProfilerSdk: " + e);
-            } catch (Throwable e) {
-                if (DEBUG) e.printStackTrace(System.out);
-                if (DEBUG) System.out.println("Instrumentation: FAILED to hook ProfilerSdk: " + e);
-            }
         }
     }
 }
