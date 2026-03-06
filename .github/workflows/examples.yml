@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'examples/**'
-      - 'src/**'
       - 'otel-extension/**'
       - 'lib/**'
       - 'build.gradle'
@@ -16,7 +15,6 @@ on:
     branches: [main]
     paths:
       - 'examples/**'
-      - 'src/**'
       - 'otel-extension/**'
       - 'lib/**'
       - 'build.gradle'
@@ -34,19 +32,6 @@ jobs:
       - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
         with:
           persist-credentials: false
-
-      - name: Set up JDK
-        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
-        with:
-          java-version: '17'
-          distribution: 'zulu'
-
-      # Build both jars first - required by the example Dockerfiles.
-      # TODO: Remove this step once pyroscope-otel is published to Maven Central.
-      # - otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar  (shadow jar) used by the otel-extension and otel-extension-manual-start examples
-      # - lib/build/libs/pyroscope-otel.jar                 (thin jar)   used by the otel-library example
-      - name: Build pyroscope-otel jars
-        run: ./gradlew :otel-extension:shadowJar :lib:jar --no-daemon
 
       - name: Build otel-extension example Docker image
         run: |
