@@ -1,115 +1,91 @@
 # Cross-Classloader Profiler Communication
 
+## Context
+- pyroscope-java - aka pyroscope agent, aka `io.pyroscope:agent`, aka pyroscope.jar - a java fat jar library, vendors async-profiler, published to maven central and github releases. Can be used as library from maven central or as javaagent for autoinstrumentation or both.
+- otel-profiling-java - aka pyroscope otel extension, aka `io.pyroscope:otel` - a SpanProcessor that listens for spans and annotates the spans with `pyroscope.profile.id` and profiles with span ids and span names - this enables the correlation between a span and a profile. The extension can be used as otel java agent extension (in this case it is loaded in a separate isolated classloader) and as a library by an app (can be in system classloader or custom classloader (for example spring boot)). The pyroscope otel extension vendors the `io.pyroscope:agent` (the whole profiler) into the `io.otel.pyroscope.shadow` package - to be able to start profiling  if no other profiler is found.
+
 ## Problem
 
-The Pyroscope profiling agent and the OpenTelemetry Java agent extension need to share state for **span-profile correlation** — linking profiling samples to trace spans by span ID.
+Otel javaagent loads pyroscope extension in an isolated classloader. The Pyroscope agent may be loaded in the system class loader (if used as -javaagent or -classpath) or other isolated classloader (for example spring boot fat jar). Profiler needs to somehow coordinate between each other (use the same storage for span ids / labels, do not start second profiler), and it's hard to do due to classloader isolations.
 
-The OTel Java agent loads extensions in an isolated `ExtensionClassLoader`, while the Pyroscope agent runs in the system (app) classloader. These classloaders have no parent-child relationship:
 
-```
-Bootstrap CL
-├── Platform CL
-│   └── Agent CL (OTel Java agent)
-│       └── ExtensionClassLoader (pyroscope-otel extension)
-└── App CL / System CL
-    ├── pyroscope-java agent (loaded via -javaagent or -classpath)
-    └── LaunchedURLClassLoader (Spring Boot fat jar)
-        └── application code, pyroscope-java (when used as library)
-```
-
-The core problem is that both the otel extension and the app classloader each had their own copy of `ProfilerApi`. Even though the class has the same fully-qualified name in both classloaders, the JVM treats them as **different types** — casting between them causes `ClassCastException`. This made it impossible for the extension to obtain a typed reference to the `ProfilerSdk` instance running in the app classloader.
-
-The only classloader visible to **all** branches of the hierarchy is the **bootstrap classloader**.
 
 ## Previous Approach
+We had `ProfilerApi` interface and `ProfilerSdk` implementation in both classloaders. The otel extension attempts to insttantiate an instance of `ProfilerSdk` with reflection from system classloader. Uses reflection to invoke methods on the `ProfilerSdk`. This approach covers the case when the pyroscope agent is available on system classloader (-javaagent or -classpath), but not fat jars
 
-Before this change, the otel extension used `OtelProfilerSdkBridge` — a reflection-based wrapper that called every `ProfilerSdk` method via `getDeclaredMethod().invoke()`. Because the extension couldn't cast to `ProfilerApi` across classloader boundaries, it had to discover the `ProfilerSdk` instance in the app classloader via `ClassLoader.getSystemClassLoader().loadClass(...)` and invoke all methods reflectively. Class name strings were Base64-encoded to prevent the shadow jar relocator from renaming them. The span processor had two separate code paths: one for the reflection bridge (when the pyroscope agent was present) and one for direct `AsyncProfiler` calls (fallback). No bootstrap classloader injection existed, and there was no way for the agent to "publish" its `ProfilerSdk` instance to the extension without reflection.
+## New Approach
 
-## Solution
 
-This change introduces three new API classes that are injected into the bootstrap classloader at startup, plus a publish mechanism where the agent stores its `ProfilerSdk` instance into a shared holder at profiler start time:
 
-| Class | Role |
-|-------|------|
-| `ProfilerApi` | Interface: `setTracingContext()`, `startProfiling()`, `registerConstant()`, etc. |
-| `ProfilerApiHolder` | Static `AtomicReference<ProfilerApi>` — the JVM-wide rendezvous point |
-| `ProfilerScopedContext` | Companion interface for scoped label management (deprecated) |
+We create a new class 
+```java
+public class ProfilerApiHolder {
+    public static final AtomicReference<ProfilerApi> INSTANCE = new AtomicReference<>();
+}
+```
 
-Once on the bootstrap classloader, **all** classloaders (Extension CL, App CL, any custom CL) resolve the same `ProfilerApiHolder` class with the same static `INSTANCE` field. The pyroscope agent publishes its `ProfilerSdk` instance into `ProfilerApiHolder.INSTANCE` at start time, and the otel extension reads it — no reflection needed. A direct cast `(ProfilerApi) sdkInstance` is safe because both sides resolve `ProfilerApi` from the same bootstrap classloader.
+And modify the pyroscope agent to set INSTANCE value upon starting. This allows to cover a custom classloader case (for example spring boot fat jar classloader), when otel extension has no idea how to reach custom class loader.
+
+The `ProfilerApiHolder` and `ProfilerApi` and unfortunately `ProfilerScopedContext` are injected into bootstrap classloader using `Instrumentation#appendToBootstrapClassLoaderSearch`. Injection happen as early as possible in two places in the agent `premain` and in the otel extension configuration entrypoint.
+
+```java
+class PyroscopeAgent {
+    // ...
+    // invoked after successful profiler start
+    private static void publishProfilerApi(Logger logger) {
+        ProfilerApiHolder.INSTANCE.set(new ProfilerSdk());
+    }
+```
+
+This allows every party to use `ProfilerApi` interface with no reflection.
 
 ## Build-Time Flow
-
-The 3 API classes live in `pyroscope-java/agent/src/main/java/io/pyroscope/javaagent/api/`. At build time:
-
-1. **`bootstrapApiJar`** task compiles and packages only these 3 classes into `pyroscope-bootstrap.jar`
-2. **`copyBootstrapToResources`** copies it as `pyroscope-bootstrap.jar.bin` into resources (`.bin` extension prevents the shadow jar plugin from merging/relocating its contents)
-3. The agent shadow jar (`pyroscope.jar`) embeds `pyroscope-bootstrap.jar.bin` as a resource
-4. The otel extension depends on `io.pyroscope:agent` — when the shadow jar plugin builds the extension, it includes the `pyroscope-bootstrap.jar.bin` resource from the agent dependency
-5. The otel extension shadow jar **excludes** the 3 API `.class` files (they are injected via bootstrap, not loaded from the extension jar)
+In the pyroscope agent at build time, we create an extra `jar` with the three mentioned classes and embed the jar with three classes as a resource to the pyroscope agent.
 
 ## Runtime Flow
 
-Both the pyroscope-java agent and the otel extension independently inject the bootstrap API classes. **Whichever runs first performs the injection; the second is a no-op** since the classes are already on the bootstrap classloader.
+1. Only otel extension is present
 
-### Scenario A: OTel Agent First (typical)
+- Extension injects the classes to the bootstrap classloader
+- Sees a null instance of `ProfilerApiHolder`
+- Attempts to instantiate a `io.pyroscope.javaagent.ProfilerSdk` from system classloader, fails
+- Sets an instance of the `io.otel.pyroscope.shadow.javaagent.ProfilerSdk` to the `ProfilerApiHolder` as fallback in order to use the vendored profiler(agent).
+- Starts profiling (`publishProfilerApi` updates `ProfilerApiHolder.INSTANCE` with a new instance of the same class `io.otel.pyroscope.shadow.javaagent.ProfilerSdk`, just different object instance)
+- The span processor uses the second instance of `io.otel.pyroscope.shadow.javaagent.ProfilerSdk` obtained from `ProfilerApiHolder` forever
 
-```
-1. OTel Java agent starts → loads pyroscope-otel extension
-2. Extension AutoConfigurationCustomizerProvider runs:
-   a. BootstrapApiInjector.ensureInjected()
-      → extracts pyroscope-bootstrap.jar.bin → injects into bootstrap CL
-   b. Seeds ProfilerApiHolder.INSTANCE with relocated fallback ProfilerSdk
-   c. Tries to load ProfilerSdk from system classloader
-      → if pyroscope agent is on classpath, replaces holder with real instance
-   d. Calls ProfilerApiHolder.INSTANCE.get().startProfiling()
-   e. Registers PyroscopeOtelSpanProcessor
-3. (Optional) Pyroscope agent premain runs later:
-   a. BootstrapApiInjector.inject() → classes already on bootstrap, no-op
-   b. publishProfilerApi() → sets ProfilerSdk into holder
-```
+2. Java agent is launched as  `-javaagent`, profiling started, otel extension is present
 
-### Scenario B: Pyroscope Agent First
+- Java agent injects the classes to the bootstrap classloader
+- Java agents starts profiling, `publishProfilerApi` updates `ProfilerApiHolder.INSTANCE` with an instance of `io.pyroscope.javaagent.ProfilerSdk` 
+- Extension injects the classes to the bootstrap again (no-op)
+- Sees a non-null instance of `ProfilerApiHolder`, does not attempt to change it.
+- The span processor uses `io.pyroscope.javaagent.ProfilerSdk`
 
-```
-1. Pyroscope agent premain runs:
-   a. BootstrapApiInjector.inject() → injects into bootstrap CL
-   b. publishProfilerApi() → sets ProfilerSdk into holder
-2. OTel Java agent starts → loads extension
-3. Extension AutoConfigurationCustomizerProvider runs:
-   a. BootstrapApiInjector.ensureInjected() → already injected, no-op
-   b. Seed with fallback → fails (holder already set)
-   c. Tries system classloader → finds real ProfilerSdk, replaces holder
-   d. Registers PyroscopeOtelSpanProcessor
-```
+3. Java agent is launched as `-javaagent`, but profiling not started, otel extension is present
 
-### Scenario C: OTel Extension Only (no Pyroscope agent)
+- Java agent injects the classes to the bootstrap classloader
+- Java agents does not start  profiling, `ProfilerApiHolder.INSTANCE` is still `null`
+- Extension injects the classes to the bootstrap again (no-op)
+- Sees a null instance of `ProfilerApiHolder`
+- Instantiates `io.pyroscope.javaagent.ProfilerSdk` from system classloader and updates `ProfilerApiHolder.INSTANCE` instance with it
+- Starts profiling (`publishProfilerApi` updates `ProfilerApiHolder.INSTANCE` with a new instance of the same class `io.pyroscope.javaagent.ProfilerSdk`, just different object instance)
+- The span processor uses `io.pyroscope.javaagent.ProfilerSdk`
 
-```
-1. Extension injects bootstrap API classes
-2. Seeds holder with relocated fallback ProfilerSdk (bundled in extension jar)
-3. System classloader lookup fails → continues with fallback
-4. Span processor uses the fallback ProfilerSdk
-```
+3. Java agent is used as classpath library(not as -javaagent), otel extension is present
 
-## Span-Profile Correlation
+- Extension injects the classes to the bootstrap 
+- Sees a null instance of `ProfilerApiHolder`
+- Instantiates `io.pyroscope.javaagent.ProfilerSdk` from system classloader and updates `ProfilerApiHolder.INSTANCE` instance with it
+- Starts profiling (`publishProfilerApi` updates `ProfilerApiHolder.INSTANCE` with a new instance of the same class `io.pyroscope.javaagent.ProfilerSdk`, just different object instance)
+- The span processor uses `io.pyroscope.javaagent.ProfilerSdk`
 
-`PyroscopeOtelSpanProcessor` is registered as an OTel `SpanProcessor`:
 
-- **`onStart()`**: Calls `api.setTracingContext(spanId, spanName)` — the profiler tags subsequent samples with this span ID
-- **`onEnd()`**: Calls `api.setTracingContext(0, 0)` — clears the tracing context
-
-The profiler embeds span IDs into profiling samples, allowing Grafana to link traces to flame graphs.
-
-## Key Files
-
-**pyroscope-java:**
-- `agent/src/main/java/io/pyroscope/javaagent/api/ProfilerApi.java` — shared interface
-- `agent/src/main/java/io/pyroscope/javaagent/api/ProfilerApiHolder.java` — cross-CL rendezvous
-- `agent/src/main/java/io/pyroscope/javaagent/BootstrapApiInjector.java` — agent-side injection
-- `agent/src/main/java/io/pyroscope/javaagent/PyroscopeAgent.java` — premain entry point
-
-**otel-profiling-java:**
-- `otel-extension/src/main/java/io/otel/pyroscope/BootstrapApiInjector.java` — extension-side injection
-- `otel-extension/src/main/java/io/otel/pyroscope/PyroscopeOtelAutoConfigurationCustomizerProvider.java` — initialization
-- `otel-extension/src/main/java/io/otel/pyroscope/PyroscopeOtelSpanProcessor.java` — span-profile linking
-- `otel-extension/src/main/java/io/pyroscope/javaagent/ProfilerSdkFactory.java` — fallback ProfilerSdk factory
+4. Java agent is used from fat jar, otel extension is present. << This was broken
+- Extension injects the classes to the bootstrap classloader
+- Sees a null instance of `ProfilerApiHolder`
+- Attempts to instantiate a `io.pyroscope.javaagent.ProfilerSdk` from system classloader, fails
+- Sets an instance of the `io.otel.pyroscope.shadow.javaagent.ProfilerSdk` to the `ProfilerApiHolder` as fallback in order to use the vendored profiler(agent).
+- Does not start profiling with `otel.pyroscope.start.profiling=false`
+- This is where this broken - previously otel extension had no way to find out about a profiler started from a fat jar classloader
+- Next java agent from fat jar starts profiling from java code as a library.(`publishProfilerApi` updates `ProfilerApiHolder.INSTANCE` with a new instance of  `io.pyroscope.javaagent.ProfilerSdk`, swapping from the vendor/shadow type to the one from agent jar library. This is the fix.
+- The span processor uses `io.pyroscope.javaagent.ProfilerSdk`
