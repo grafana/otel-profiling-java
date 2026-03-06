@@ -5,6 +5,9 @@ import io.pyroscope.javaagent.api.ProfilerApi;
 import io.pyroscope.javaagent.api.ProfilerApiHolder;
 
 import java.lang.reflect.Constructor;
+import java.net.URL;
+import java.net.URLClassLoader;
+
 class ProfilerApiInteraction {
 
     static void ensureProfilerApiSet() {
@@ -36,6 +39,17 @@ class ProfilerApiInteraction {
             return api;
         } catch (Exception e) {
             PyroscopeOtelDebug.log("ProfilerApiInteraction: Could not load from system classloader: " + e.getMessage());
+            if (PyroscopeOtelDebug.DEBUG) {
+                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+                if (systemClassLoader instanceof URLClassLoader) {
+                    PyroscopeOtelDebug.log("  JARs visible to system classloader:");
+                    for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
+                        PyroscopeOtelDebug.log("    " + url);
+                    }
+                } else {
+                    PyroscopeOtelDebug.log("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
+                }
+            }
             return null;
         }
     }
