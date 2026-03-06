@@ -62,7 +62,7 @@ Both the pyroscope-java agent and the otel extension independently inject the bo
    e. Registers PyroscopeOtelSpanProcessor
 3. (Optional) Pyroscope agent premain runs later:
    a. BootstrapApiInjector.inject() → classes already on bootstrap, no-op
-   b. publishProfilerApi() → CAS sets ProfilerSdk into holder
+   b. publishProfilerApi() → sets ProfilerSdk into holder
 ```
 
 ### Scenario B: Pyroscope Agent First
@@ -70,11 +70,11 @@ Both the pyroscope-java agent and the otel extension independently inject the bo
 ```
 1. Pyroscope agent premain runs:
    a. BootstrapApiInjector.inject() → injects into bootstrap CL
-   b. publishProfilerApi() → CAS sets ProfilerSdk into holder
+   b. publishProfilerApi() → sets ProfilerSdk into holder
 2. OTel Java agent starts → loads extension
 3. Extension AutoConfigurationCustomizerProvider runs:
    a. BootstrapApiInjector.ensureInjected() → already injected, no-op
-   b. CAS seed with fallback → fails (holder already set)
+   b. Seed with fallback → fails (holder already set)
    c. Tries system classloader → finds real ProfilerSdk, replaces holder
    d. Registers PyroscopeOtelSpanProcessor
 ```
