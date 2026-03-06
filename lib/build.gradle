@@ -12,7 +12,7 @@ dependencies {
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
     // OTel SDK classes (SpanProcessor, etc.) — compileOnly, users must add the OTel SDK to their own dependencies.
-    compileOnly("io.opentelemetry:opentelemetry-sdk-trace:1.41.0")
+    compileOnly("io.opentelemetry:opentelemetry-sdk-trace:1.59.0")
 }
 
 // Tests run only in otel-extension module
