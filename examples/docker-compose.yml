@@ -26,11 +26,7 @@ services:
       PYROSCOPE_APPLICATION_NAME: otel-extension-example
       PYROSCOPE_FORMAT: jfr
       OTEL_SERVICE_NAME: otel-extension-example
-      # Use the built-in logging exporter to print span names and IDs to stdout.
-      # This makes it easy to verify that the OTel agent is creating spans and that
-      # PyroscopeOtelSpanProcessor is receiving them.
       OTEL_TRACES_EXPORTER: logging
-      # Disable logs and metrics exporters - no collector is running in this demo.
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
     ports:
@@ -60,15 +56,10 @@ services:
       PYROSCOPE_SERVER_ADDRESS: http://pyroscope:4040
       PYROSCOPE_APPLICATION_NAME: otel-extension-manual-start-example
       OTEL_SERVICE_NAME: otel-extension-manual-start-example
-      # Tell the pyroscope-otel extension NOT to start the profiler automatically.
-      # The app starts PyroscopeAgent programmatically in App.java instead.
       OTEL_PYROSCOPE_START_PROFILING: "false"
-      # Use the built-in logging exporter to print span names and IDs to stdout.
       OTEL_TRACES_EXPORTER: logging
-      # Disable logs and metrics exporters - no collector is running in this demo.
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
-      # Enable debug logging for OTel agent instrumentation
       OTEL_JAVAAGENT_DEBUG: "true"
     ports:
       - "8082:8080"
