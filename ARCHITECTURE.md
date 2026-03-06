@@ -12,7 +12,7 @@ Bootstrap CL
 │   └── Agent CL (OTel Java agent)
 │       └── ExtensionClassLoader (pyroscope-otel extension)
 └── App CL / System CL
-    ├── pyroscope-java agent (loaded via -javaagent)
+    ├── pyroscope-java agent (loaded via -javaagent or -classpath)
     └── LaunchedURLClassLoader (Spring Boot fat jar)
         └── application code, pyroscope-java (when used as library)
 ```
