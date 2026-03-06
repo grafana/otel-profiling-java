@@ -11,7 +11,10 @@ Bootstrap CL
 ├── Platform CL
 │   └── Agent CL (OTel Java agent)
 │       └── ExtensionClassLoader (pyroscope-otel extension)
-└── App CL / System CL (pyroscope-java agent, application code)
+└── App CL / System CL
+    ├── pyroscope-java agent (loaded via -javaagent)
+    └── LaunchedURLClassLoader (Spring Boot fat jar)
+        └── application code, pyroscope-java (when used as library)
 ```
 
 The core problem is that both the otel extension and the app classloader each had their own copy of `ProfilerApi`. Even though the class has the same fully-qualified name in both classloaders, the JVM treats them as **different types** — casting between them causes `ClassCastException`. This made it impossible for the extension to obtain a typed reference to the `ProfilerSdk` instance running in the app classloader.
