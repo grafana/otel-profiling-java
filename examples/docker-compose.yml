@@ -1,12 +1,3 @@
-# Prerequisites:
-#   1. Build the pyroscope-otel jars from the repository root:
-#      ./gradlew :otel-extension:shadowJar :lib:jar
-#   2. Then from this directory:
-#      docker-compose up --build
-#
-# TODO: Once pyroscope-otel is published to Maven Central, step 1 will no longer
-#       be required. The Dockerfiles will reference the published artifact directly.
-
 services:
   pyroscope:
     image: grafana/pyroscope:latest
@@ -28,7 +19,6 @@ services:
 
   otel-extension-example:
     build:
-      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
       context: ..
       dockerfile: examples/with-otel-extension/Dockerfile
     environment:
@@ -64,7 +54,6 @@ services:
 
   otel-extension-manual-start-example:
     build:
-      # Context is the repo root so Dockerfiles can access otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar
       context: ..
       dockerfile: examples/with-otel-extension-manual-start/Dockerfile
     environment:
@@ -79,6 +68,8 @@ services:
       # Disable logs and metrics exporters - no collector is running in this demo.
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
+      # Enable debug logging for OTel agent instrumentation
+      OTEL_JAVAAGENT_DEBUG: "true"
     ports:
       - "8082:8080"
     depends_on:

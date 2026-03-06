@@ -1,11 +1,13 @@
 .git
-src
 .github
-gradle
-gradlew
-gradlew.bat
 Makefile
 *.md
+# Allow Gradle wrapper for multi-stage builds
+!gradle/
+!gradlew
+!gradlew.bat
+# Allow otel-extension source for building
+!otel-extension/
 !examples/
 # Allow the pre-built pyroscope-otel jars needed by example Dockerfiles
 !otel-extension/build/libs/
