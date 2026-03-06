@@ -6,7 +6,7 @@
 
 ## Problem
 
-Otel javaagent loads pyroscope extension in an isolated classloader. The Pyroscope agent may be loaded in the system class loader (if used as -javaagent or -classpath) or other isolated classloader (for example spring boot fat jar). Profiler needs to somehow coordinate between each other (use the same storage for span ids / labels, do not start second profiler), and it's hard to do due to classloader isolations.
+Otel javaagent loads pyroscope extension in an isolated classloader. The Pyroscope agent may be loaded in the system class loader (if used as -javaagent or -classpath) or other isolated classloader (for example spring boot fat jar). Profiler needs to somehow coordinate between each other (use the same storage for span ids / labels, do not start second profiler), and it's hard to do due to classloader isolations. Especially in the case when the pyroscope agent is loaded from an insolated non system class loader (spring boot fat jar)
 
 
 
