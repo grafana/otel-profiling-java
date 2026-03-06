@@ -28,6 +28,11 @@ subprojects {
     }
 
     repositories {
+        // Use GitHub as a Maven repository for pyroscope-java artifacts
+        // TODO: Replace branch vk/5c8d-merge-squash-the with main once PR is merged
+        maven {
+            url = uri("https://raw.githubusercontent.com/korniltsev-grafanista-yolo-vibecoder239/pyroscope-java/vk/5c8d-merge-squash-the/maven-repo")
+        }
         mavenCentral()
     }
 }

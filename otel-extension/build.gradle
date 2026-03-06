@@ -9,9 +9,14 @@ targetCompatibility = JavaVersion.VERSION_1_8
 dependencies {
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
+    compileOnly 'org.jetbrains:annotations:26.0.2'
+
     compileOnly("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:${versions.opentelemetry}")
     compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-extension-api:${versions.opentelemetryJavaagentAlpha}")
+
+    // Private API — used for appendToBootstrapClassLoaderSearch() to inject shared API classes.
+    compileOnly("io.opentelemetry.javaagent:opentelemetry-javaagent-bootstrap:${versions.opentelemetryJavaagentAlpha}")
 
     testImplementation("io.opentelemetry:opentelemetry-sdk:${versions.opentelemetry}")
     testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:${versions.opentelemetry}")
@@ -39,8 +44,17 @@ java {
 shadowJar {
     archiveFileName = "pyroscope-otel-javaagent-extension.jar"
     relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
-        exclude 'io.pyroscope.javaagent.ProfilerSdk'
+        // Keep references to API classes unrelocated so they resolve from the bootstrap CL
+        // (where BootstrapApiInjector injects them). The .class files are excluded below.
+        exclude 'io.pyroscope.javaagent.api.ProfilerApi'
+        exclude 'io.pyroscope.javaagent.api.ProfilerApiHolder'
+        exclude 'io.pyroscope.javaagent.api.ProfilerScopedContext'
     }
+    // Exclude the API classes from the extension jar — they are injected into the bootstrap
+    // classloader at startup from the embedded pyroscope-bootstrap.jar.bin resource.
+    exclude 'io/pyroscope/javaagent/api/ProfilerApi.class'
+    exclude 'io/pyroscope/javaagent/api/ProfilerApiHolder.class'
+    exclude 'io/pyroscope/javaagent/api/ProfilerScopedContext.class'
+
     archiveClassifier.set('')
 }
-

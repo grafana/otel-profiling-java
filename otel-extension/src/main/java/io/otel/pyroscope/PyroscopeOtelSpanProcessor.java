@@ -7,9 +7,8 @@ import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
-import io.pyroscope.PyroscopeAsyncProfiler;
-import io.pyroscope.labels.v2.Pyroscope;
-import io.pyroscope.vendor.one.profiler.AsyncProfiler;
+import io.pyroscope.javaagent.api.ProfilerApi;
+import io.pyroscope.javaagent.api.ProfilerApiHolder;
 
 
 public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
@@ -17,17 +16,9 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
 
     private final PyroscopeOtelConfiguration configuration;
-    private final OtelProfilerSdkBridge profilerSdk;
-    private final AsyncProfiler asprof;
 
-    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration, OtelProfilerSdkBridge profilerSdk) {
+    public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration) {
         this.configuration = configuration;
-        this.profilerSdk = profilerSdk;
-        if (profilerSdk == null) {
-            asprof = PyroscopeAsyncProfiler.getAsyncProfiler();
-        } else {
-            asprof = null;
-        }
     }
 
     @Override
@@ -40,46 +31,33 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         return true;
     }
 
+    private ProfilerApi getProfiler() {
+        return ProfilerApiHolder.INSTANCE.get();
+    }
+
     @Override
     public void onStart(Context parentContext, ReadWriteSpan span) {
         if (configuration.rootSpanOnly && !isRootSpan(span)) {
             return;
         }
+        ProfilerApi api = getProfiler();
         String strProfileId = span.getSpanContext().getSpanId();
-        long spanName;
         long spanId = parseSpanId(strProfileId);
+        long spanName;
         if (configuration.addSpanName) {
-            spanName = registerConstant(span.getName());
+            spanName = api.registerConstant(span.getName());
         } else {
             spanName = 0;
         }
 
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
-        setTracingContextForSpan(spanId, spanName);
+        api.setTracingContext(spanId, spanName);
     }
-
 
     @Override
     public void onEnd(ReadableSpan span) {
-        setTracingContextForSpan(0, 0);
+        getProfiler().setTracingContext(0, 0);
     }
-
-    private void setTracingContextForSpan(long spanId, long spanName) {
-        if (profilerSdk != null) {
-            profilerSdk.setTracingContext(spanId, spanName);
-        }
-        if (asprof != null) {
-            asprof.setTracingContext(spanId, spanName);
-        }
-    }
-
-    private  long registerConstant(String name) {
-        if (profilerSdk != null) {
-            return profilerSdk.registerConstant(name);
-        }
-        return Pyroscope.LabelsWrapper.registerConstant(name);
-    }
-
 
     public static long parseSpanId(String strProfileId) {
         if (strProfileId == null || strProfileId.length() != 16) {
