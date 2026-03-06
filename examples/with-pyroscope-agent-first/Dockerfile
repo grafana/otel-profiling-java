@@ -1,4 +1,4 @@
-FROM gradle:8.14.3-jdk17 AS builder
+FROM gradle:8.14.4-jdk17@sha256:1ad0ceec1f44ceeeafbdb67fbe68e974e3ebbcb73b2a8622d64e869172a03c81 AS builder
 WORKDIR /build
 COPY examples/with-otel-extension/build.gradle ./build.gradle
 COPY examples/with-otel-extension/settings.gradle ./settings.gradle
