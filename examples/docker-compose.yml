@@ -1,3 +1,12 @@
+# docker-compose.yml for otel-profiling-java examples
+#
+# The example Dockerfiles use multi-stage builds to compile the otel-extension from source.
+# No manual build steps are required - just run: docker-compose up
+#
+# Build context is set to repository root (..) to access:
+#   - otel-extension source and build files for compilation
+#   - Example app source and build files
+
 services:
   pyroscope:
     image: grafana/pyroscope:latest
@@ -19,6 +28,7 @@ services:
 
   otel-extension-example:
     build:
+      # Context is repo root for multi-stage build to compile otel-extension and example app
       context: ..
       dockerfile: examples/with-otel-extension/Dockerfile
     environment:
@@ -54,6 +64,7 @@ services:
 
   otel-extension-manual-start-example:
     build:
+      # Context is repo root for multi-stage build to compile otel-extension and example app
       context: ..
       dockerfile: examples/with-otel-extension-manual-start/Dockerfile
     environment:
