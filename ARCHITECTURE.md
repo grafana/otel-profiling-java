@@ -14,13 +14,17 @@ Bootstrap CL
 └── App CL / System CL (pyroscope-java agent, application code)
 ```
 
-Even if both classloaders have `ProfilerApiHolder` on their classpath, the JVM treats them as **different types** (loaded by different classloaders). Attempting to cast between them causes `ClassCastException`. The old workaround was a reflection-based bridge (`OtelProfilerSdkBridge`) that called every method via `getDeclaredMethod().invoke()` — fragile, slow, and required Base64-encoding class names to defeat the shadow jar relocator.
+Even if both classloaders have a class with the same fully-qualified name, the JVM treats them as **different types** when loaded by different classloaders. Attempting to cast between them causes `ClassCastException`.
 
 The only classloader visible to **all** branches of the hierarchy is the **bootstrap classloader**.
 
+## Previous Approach
+
+Before this change, the otel extension used `OtelProfilerSdkBridge` — a reflection-based wrapper that called every `ProfilerSdk` method via `getDeclaredMethod().invoke()`. Every span start/end went through reflection. Class name strings were Base64-encoded to prevent the shadow jar relocator from renaming them. The span processor had two separate code paths: one for the reflection bridge (when the pyroscope agent was present) and one for direct `AsyncProfiler` calls (fallback). No bootstrap classloader injection existed.
+
 ## Solution
 
-Three small API classes are injected into the bootstrap classloader at startup:
+This change introduces three new API classes that are injected into the bootstrap classloader at startup:
 
 | Class | Role |
 |-------|------|
