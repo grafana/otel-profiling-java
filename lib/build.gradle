@@ -11,12 +11,11 @@ dependencies {
     // Not vendored - declared as regular dependency, appears in the POM
     implementation("io.pyroscope:agent:${pyroscopeVersion}")
 
-    // OTel SDK classes (SpanProcessor, etc.) are provided transitively by io.pyroscope:agent.
-    // Users must also add the OTel SDK to their own dependencies.
+    // OTel SDK classes (SpanProcessor, etc.) — compileOnly, users must add the OTel SDK to their own dependencies.
     compileOnly("io.opentelemetry:opentelemetry-sdk-trace:1.41.0")
 }
 
-// Tests run only in agent-extension since source is identical
+// Tests run only in otel-extension module
 test.enabled = false
 
 java {

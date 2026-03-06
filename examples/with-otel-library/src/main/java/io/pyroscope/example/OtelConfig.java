@@ -34,6 +34,8 @@ public class OtelConfig {
                         .build()
         );
 
+        // The lib module uses the simplified SpanProcessor that calls io.pyroscope classes
+        // directly from the same classloader as PyroscopeAgent above - no bridge needed.
         PyroscopeOtelSpanProcessor pyroscopeProcessor = new PyroscopeOtelSpanProcessor();
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
