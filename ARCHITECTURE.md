@@ -14,17 +14,17 @@ Bootstrap CL
 └── App CL / System CL (pyroscope-java agent, application code)
 ```
 
-Even if both classloaders have a class with the same fully-qualified name, the JVM treats them as **different types** when loaded by different classloaders. Attempting to cast between them causes `ClassCastException`.
+The core problem is that both the otel extension and the app classloader each had their own copy of `ProfilerApi`. Even though the class has the same fully-qualified name in both classloaders, the JVM treats them as **different types** — casting between them causes `ClassCastException`. This made it impossible for the extension to obtain a typed reference to the `ProfilerSdk` instance running in the app classloader.
 
 The only classloader visible to **all** branches of the hierarchy is the **bootstrap classloader**.
 
 ## Previous Approach
 
-Before this change, the otel extension used `OtelProfilerSdkBridge` — a reflection-based wrapper that called every `ProfilerSdk` method via `getDeclaredMethod().invoke()`. Every span start/end went through reflection. Class name strings were Base64-encoded to prevent the shadow jar relocator from renaming them. The span processor had two separate code paths: one for the reflection bridge (when the pyroscope agent was present) and one for direct `AsyncProfiler` calls (fallback). No bootstrap classloader injection existed.
+Before this change, the otel extension used `OtelProfilerSdkBridge` — a reflection-based wrapper that called every `ProfilerSdk` method via `getDeclaredMethod().invoke()`. Because the extension couldn't cast to `ProfilerApi` across classloader boundaries, it had to discover the `ProfilerSdk` instance in the app classloader via `ClassLoader.getSystemClassLoader().loadClass(...)` and invoke all methods reflectively. Class name strings were Base64-encoded to prevent the shadow jar relocator from renaming them. The span processor had two separate code paths: one for the reflection bridge (when the pyroscope agent was present) and one for direct `AsyncProfiler` calls (fallback). No bootstrap classloader injection existed, and there was no way for the agent to "publish" its `ProfilerSdk` instance to the extension without reflection.
 
 ## Solution
 
-This change introduces three new API classes that are injected into the bootstrap classloader at startup:
+This change introduces three new API classes that are injected into the bootstrap classloader at startup, plus a publish mechanism where the agent stores its `ProfilerSdk` instance into a shared holder at profiler start time:
 
 | Class | Role |
 |-------|------|
@@ -32,7 +32,7 @@ This change introduces three new API classes that are injected into the bootstra
 | `ProfilerApiHolder` | Static `AtomicReference<ProfilerApi>` — the JVM-wide rendezvous point |
 | `ProfilerScopedContext` | Companion interface for scoped label management (deprecated) |
 
-Once on the bootstrap classloader, **all** classloaders (Extension CL, App CL, any custom CL) resolve the same `ProfilerApiHolder` class with the same static `INSTANCE` field. A direct cast `(ProfilerApi) sdkInstance` is safe — no reflection needed.
+Once on the bootstrap classloader, **all** classloaders (Extension CL, App CL, any custom CL) resolve the same `ProfilerApiHolder` class with the same static `INSTANCE` field. The pyroscope agent publishes its `ProfilerSdk` instance into `ProfilerApiHolder.INSTANCE` at start time, and the otel extension reads it — no reflection needed. A direct cast `(ProfilerApi) sdkInstance` is safe because both sides resolve `ProfilerApi` from the same bootstrap classloader.
 
 ## Build-Time Flow
 
