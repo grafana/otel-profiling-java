@@ -14,6 +14,9 @@ import java.util.jar.JarFile;
  * Injects the shared ProfilerApi classes into the bootstrap classloader at extension startup.
  * This ensures that both the ExtensionClassLoader (span processor) and the app classloader
  * (ByteBuddy advice) resolve the same ProfilerApiHolder class with the same static fields.
+ *
+ * A very similar injector exists in pyroscope-java agent's premain:
+ * {@code io.pyroscope.javaagent.BootstrapApiInjector} in the pyroscope-java repository.
  */
 class BootstrapApiInjector {
 

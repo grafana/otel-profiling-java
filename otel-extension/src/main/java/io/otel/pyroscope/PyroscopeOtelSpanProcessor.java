@@ -15,19 +15,6 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     private static final AttributeKey<String> ATTRIBUTE_KEY_PROFILE_ID = AttributeKey.stringKey("pyroscope.profile.id");
 
-    static {
-        // Initialize with the vendored/relocated embedded ProfilerSdk as the default.
-        // After shadow jar relocation, ProfilerSdkFactory becomes
-        // io.otel.pyroscope.shadow.javaagent.ProfilerSdkFactory, creating the relocated ProfilerSdk.
-        // This may be replaced later by:
-        // - tryLoadFromSystemClassLoader() in AutoConfig, or
-        // - ProfilerSdkInstrumentation hooking PyroscopeAgent.start()
-        //
-        // Because ProfilerApiHolder is on the bootstrap classloader, all classloaders
-        // (extension CL, app CL) share the SAME static AtomicReference field.
-        ProfilerApiHolder.INSTANCE.compareAndSet(null, io.pyroscope.javaagent.ProfilerSdkFactory.create());
-    }
-
     private final PyroscopeOtelConfiguration configuration;
 
     public PyroscopeOtelSpanProcessor(PyroscopeOtelConfiguration configuration) {
