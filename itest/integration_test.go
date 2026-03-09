@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -111,15 +112,6 @@ func extractSpanIDFromBody(body string) (string, error) {
 	matches := re.FindStringSubmatch(body)
 	if len(matches) < 2 {
 		return "", fmt.Errorf("spanId not found in response body: %s", body)
-	}
-	return matches[1], nil
-}
-
-func extractNamedSpanID(body string, name string) (string, error) {
-	re := regexp.MustCompile(name + `=([0-9a-fA-F]{16})`)
-	matches := re.FindStringSubmatch(body)
-	if len(matches) < 2 {
-		return "", fmt.Errorf("%s not found in response body: %s", name, body)
 	}
 	return matches[1], nil
 }
@@ -433,6 +425,34 @@ func TestPyroscopeAgentFirst(t *testing.T) {
 	eventuallyProfile(t, pyroscopeURL, appName, spanId, expected)
 }
 
+// sumCpuForFunction parses collapsed profile output and sums the self values
+// of all stacks that contain the given function name.
+// Collapsed format: "frame;frame;...;leaf <self_value>\n"
+func sumCpuForFunction(collapsed string, funcName string) int64 {
+	var total int64
+	for _, line := range strings.Split(strings.TrimSpace(collapsed), "\n") {
+		if line == "" {
+			continue
+		}
+		// Split on last space: "stack_frames self_value"
+		lastSpace := strings.LastIndex(line, " ")
+		if lastSpace < 0 {
+			continue
+		}
+		stack := line[:lastSpace]
+		valueStr := line[lastSpace+1:]
+		if !strings.Contains(stack, funcName) {
+			continue
+		}
+		v, err := strconv.ParseInt(valueStr, 10, 64)
+		if err != nil {
+			continue
+		}
+		total += v
+	}
+	return total
+}
+
 func TestOtelLibraryChildSpans(t *testing.T) {
 	const appName = "otel-library-child-spans-test"
 	ctx := context.Background()
@@ -462,39 +482,37 @@ func TestOtelLibraryChildSpans(t *testing.T) {
 	appURL := getBaseURL(t, ctx, appC)
 	t.Logf("App URL: %s", appURL)
 
-	// Hit the /child-spans endpoint and extract all three span IDs.
-	var rootSpanId, child1SpanId, child2SpanId string
+	// Hit the /child-spans endpoint and extract the span ID.
+	var spanId string
 	eventually(t, func() bool {
 		body := requestChildSpans(t, appURL)
-		rootSpanId, _ = extractNamedSpanID(body, "rootSpanId")
-		child1SpanId, _ = extractNamedSpanID(body, "child1SpanId")
-		child2SpanId, _ = extractNamedSpanID(body, "child2SpanId")
-		return rootSpanId != "" && child1SpanId != "" && child2SpanId != ""
+		spanId, err = extractSpanIDFromBody(body)
+		return err == nil && spanId != ""
 	})
 
-	t.Logf("rootSpanId=%s child1SpanId=%s child2SpanId=%s", rootSpanId, child1SpanId, child2SpanId)
+	t.Logf("spanId=%s", spanId)
 
 	ls := labelSelector(appName)
 
-	// Poll until both child span profiles have non-zero totals.
+	// Poll until the span profile contains both burnChild1 and burnChild2 stacks.
 	var child1Total, child2Total int64
-	var lastErr1, lastErr2 error
+	var lastCollapsed string
+	var lastErr error
 	ok := assert.Eventually(t, func() bool {
-		tree1, err1 := querySpanTree(t, pyroscopeURL, ls, child1SpanId)
-		lastErr1 = err1
-		if err1 == nil {
-			child1Total = tree1.Total()
+		collapsed, queryErr := querySpanPyroscopeProfile(t, pyroscopeURL, ls, spanId)
+		lastErr = queryErr
+		lastCollapsed = collapsed
+		if queryErr != nil || collapsed == "" {
+			return false
 		}
-		tree2, err2 := querySpanTree(t, pyroscopeURL, ls, child2SpanId)
-		lastErr2 = err2
-		if err2 == nil {
-			child2Total = tree2.Total()
-		}
-		return err1 == nil && err2 == nil && child1Total > 0 && child2Total > 0
+		child1Total = sumCpuForFunction(collapsed, "WorkController.burnChild1")
+		child2Total = sumCpuForFunction(collapsed, "WorkController.burnChild2")
+		return child1Total > 0 && child2Total > 0
 	}, 60*time.Second, 2*time.Second)
 	if !ok {
-		t.Logf("child1 query error: %v, total: %d ns", lastErr1, child1Total)
-		t.Logf("child2 query error: %v, total: %d ns", lastErr2, child2Total)
+		t.Logf("query error: %v", lastErr)
+		t.Logf("last collapsed profile:\n%s", lastCollapsed)
+		t.Logf("child1 (burnChild1) total: %d ns, child2 (burnChild2) total: %d ns", child1Total, child2Total)
 		t.FailNow()
 	}
 
