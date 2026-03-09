@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkController {
 
     private final FibonacciService fibonacciService;
+    private final CpuBurner cpuBurner;
 
-    public WorkController(FibonacciService fibonacciService) {
+    public WorkController(FibonacciService fibonacciService, CpuBurner cpuBurner) {
         this.fibonacciService = fibonacciService;
+        this.cpuBurner = cpuBurner;
     }
 
     /**
@@ -32,6 +34,33 @@ public class WorkController {
             return "fibonacci(" + n + ") = " + result + " spanId=" + span.getSpanContext().getSpanId();
         } finally {
             span.end();
+        }
+    }
+
+    @GetMapping("/child-spans")
+    public String childSpans() {
+        Tracer tracer = GlobalOpenTelemetry.getTracer("otel-library-example", "1.0");
+        Span rootSpan = tracer.spanBuilder("child-spans").startSpan();
+        try (Scope rootScope = rootSpan.makeCurrent()) {
+            Span child1 = tracer.spanBuilder("child1").startSpan();
+            try (Scope s1 = child1.makeCurrent()) {
+                cpuBurner.burnFor(1_000);
+            } finally {
+                child1.end();
+            }
+
+            Span child2 = tracer.spanBuilder("child2").startSpan();
+            try (Scope s2 = child2.makeCurrent()) {
+                cpuBurner.burnFor(2_000);
+            } finally {
+                child2.end();
+            }
+
+            return "rootSpanId=" + rootSpan.getSpanContext().getSpanId()
+                    + " child1SpanId=" + child1.getSpanContext().getSpanId()
+                    + " child2SpanId=" + child2.getSpanContext().getSpanId();
+        } finally {
+            rootSpan.end();
         }
     }
 
