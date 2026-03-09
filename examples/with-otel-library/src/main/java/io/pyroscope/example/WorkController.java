@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkController {
 
     private final FibonacciService fibonacciService;
+    private final CpuBurner cpuBurner;
 
-    public WorkController(FibonacciService fibonacciService) {
+    public WorkController(FibonacciService fibonacciService, CpuBurner cpuBurner) {
         this.fibonacciService = fibonacciService;
+        this.cpuBurner = cpuBurner;
     }
 
     /**
@@ -33,6 +35,39 @@ public class WorkController {
         } finally {
             span.end();
         }
+    }
+
+    @GetMapping("/child-spans")
+    public String childSpans() {
+        Tracer tracer = GlobalOpenTelemetry.getTracer("otel-library-example", "1.0");
+        Span span = tracer.spanBuilder("child-spans").startSpan();
+        try (Scope scope = span.makeCurrent()) {
+            Span child1 = tracer.spanBuilder("child1").startSpan();
+            try (Scope s1 = child1.makeCurrent()) {
+                burnChild1();
+            } finally {
+                child1.end();
+            }
+
+            Span child2 = tracer.spanBuilder("child2").startSpan();
+            try (Scope s2 = child2.makeCurrent()) {
+                burnChild2();
+            } finally {
+                child2.end();
+            }
+
+            return "spanId=" + span.getSpanContext().getSpanId();
+        } finally {
+            span.end();
+        }
+    }
+
+    private void burnChild1() {
+        cpuBurner.burnFor(2_000);
+    }
+
+    private void burnChild2() {
+        cpuBurner.burnFor(4_000);
     }
 
     @GetMapping("/health")

@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -115,6 +117,22 @@ func extractSpanIDFromBody(body string) (string, error) {
 	return matches[1], nil
 }
 
+func requestChildSpans(t *testing.T, baseURL string) string {
+	t.Helper()
+	u := baseURL + "/child-spans"
+	t.Logf("requesting child-spans at %s", u)
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("child-spans request failed: %v", err)
+		return ""
+	}
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	res := strings.TrimSpace(string(body))
+	t.Logf("child-spans response: %s", res)
+	return res
+}
+
 func extractSpanIDFromLogs(ctx context.Context, c testcontainers.Container) (string, error) {
 	reader, err := c.Logs(ctx)
 	if err != nil {
@@ -151,6 +169,17 @@ func labelSelector(appName string) string {
 
 func querySpanPyroscopeProfile(t *testing.T, pyroscopeURL string, labelSelector string, span string) (string, error) {
 	t.Helper()
+	tree, err := querySpanTree(t, pyroscopeURL, labelSelector, span)
+	if err != nil {
+		return "", err
+	}
+	buf := bytes.NewBuffer(nil)
+	tree.WriteCollapsed(buf)
+	return buf.String(), nil
+}
+
+func querySpanTree(t *testing.T, pyroscopeURL string, labelSelector string, span string) (*model.Tree, error) {
+	t.Helper()
 	qc := querierv1connect.NewQuerierServiceClient(http.DefaultClient, pyroscopeURL)
 
 	to := time.Now()
@@ -165,17 +194,11 @@ func querySpanPyroscopeProfile(t *testing.T, pyroscopeURL string, labelSelector 
 		MaxNodes:      &maxNodes,
 		Format:        querierv1.ProfileFormat_PROFILE_FORMAT_TREE,
 	}))
-	t.Logf("querySpanPyroscopeProfile %s %s %s = err %+v", pyroscopeURL, labelSelector, span, err)
+	t.Logf("querySpanTree %s %s %s = err %+v", pyroscopeURL, labelSelector, span, err)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	tt, err := model.UnmarshalTree(resp.Msg.Tree)
-	if err != nil {
-		return "", err
-	}
-	buf := bytes.NewBuffer(nil)
-	tt.WriteCollapsed(buf)
-	return buf.String(), nil
+	return model.UnmarshalTree(resp.Msg.Tree)
 }
 
 func TestOtelExtension(t *testing.T) {
@@ -401,4 +424,103 @@ func TestPyroscopeAgentFirst(t *testing.T) {
 	const expected = ";java/lang/Thread.run;org/apache/tomcat/util/threads/TaskThread$WrappingRunnable.run;org/apache/tomcat/util/threads/ThreadPoolExecutor$Worker.run;org/apache/tomcat/util/threads/ThreadPoolExecutor.runWorker;org/apache/tomcat/util/net/SocketProcessorBase.run;org/apache/tomcat/util/net/NioEndpoint$SocketProcessor.doRun;org/apache/coyote/AbstractProtocol$ConnectionHandler.process;org/apache/coyote/AbstractProcessorLight.process;org/apache/coyote/http11/Http11Processor.service;org/apache/catalina/connector/CoyoteAdapter.service;org/apache/catalina/core/StandardEngineValve.invoke;org/apache/catalina/valves/ErrorReportValve.invoke;org/apache/catalina/core/StandardHostValve.invoke;org/apache/catalina/authenticator/AuthenticatorBase.invoke;org/apache/catalina/core/StandardContextValve.invoke;org/apache/catalina/core/StandardWrapperValve.invoke;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/CharacterEncodingFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/servlet/v3_1/OpenTelemetryHandlerMappingFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/FormContentFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/springframework/web/filter/OncePerRequestFilter.doFilter;org/springframework/web/filter/RequestContextFilter.doFilterInternal;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;org/apache/tomcat/websocket/server/WsFilter.doFilter;org/apache/catalina/core/ApplicationFilterChain.doFilter;org/apache/catalina/core/ApplicationFilterChain.internalDoFilter;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.service;javax/servlet/http/HttpServlet.service;org/springframework/web/servlet/FrameworkServlet.doGet;org/springframework/web/servlet/FrameworkServlet.processRequest;org/springframework/web/servlet/DispatcherServlet.doService;org/springframework/web/servlet/DispatcherServlet.doDispatch;org/springframework/web/servlet/mvc/method/AbstractHandlerMethodAdapter.handle;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.handleInternal;org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.invokeHandlerMethod;org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.invokeAndHandle;org/springframework/web/method/support/InvocableHandlerMethod.invokeForRequest;org/springframework/web/method/support/InvocableHandlerMethod.doInvoke;java/lang/reflect/Method.invoke;jdk/internal/reflect/DelegatingMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke;jdk/internal/reflect/NativeMethodAccessorImpl.invoke0;io/pyroscope/example/WorkController.fibonacci;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute;io/pyroscope/example/FibonacciService.compute"
 
 	eventuallyProfile(t, pyroscopeURL, appName, spanId, expected)
+}
+
+// sumCpuForFunction parses collapsed profile output and sums the self values
+// of all stacks that contain the given function name.
+// Collapsed format: "frame;frame;...;leaf <self_value>\n"
+func sumCpuForFunction(collapsed string, funcName string) int64 {
+	var total int64
+	for _, line := range strings.Split(strings.TrimSpace(collapsed), "\n") {
+		if line == "" {
+			continue
+		}
+		// Split on last space: "stack_frames self_value"
+		lastSpace := strings.LastIndex(line, " ")
+		if lastSpace < 0 {
+			continue
+		}
+		stack := line[:lastSpace]
+		valueStr := line[lastSpace+1:]
+		if !strings.Contains(stack, funcName) {
+			continue
+		}
+		v, err := strconv.ParseInt(valueStr, 10, 64)
+		if err != nil {
+			continue
+		}
+		total += v
+	}
+	return total
+}
+
+func TestOtelLibraryChildSpans(t *testing.T) {
+	const appName = "otel-library-child-spans-test"
+	ctx := context.Background()
+	root := repoRoot()
+
+	net, err := network.New(ctx)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, net.Remove(ctx))
+	}()
+
+	pyroscopeC := startPyroscope(t, ctx, net)
+	defer func() {
+		require.NoError(t, pyroscopeC.Terminate(ctx))
+	}()
+	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	t.Logf("Pyroscope URL: %s", pyroscopeURL)
+
+	appC := startApp(t, ctx, root, "examples/with-otel-library/Dockerfile", net, map[string]string{
+		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
+		"PYROSCOPE_APPLICATION_NAME": appName,
+	})
+	defer func() {
+		require.NoError(t, appC.Terminate(ctx))
+	}()
+
+	appURL := getBaseURL(t, ctx, appC)
+	t.Logf("App URL: %s", appURL)
+
+	// Hit the /child-spans endpoint and extract the span ID.
+	var spanId string
+	eventually(t, func() bool {
+		body := requestChildSpans(t, appURL)
+		spanId, err = extractSpanIDFromBody(body)
+		return err == nil && spanId != ""
+	})
+
+	t.Logf("spanId=%s", spanId)
+
+	ls := labelSelector(appName)
+
+	// Poll until the span profile contains burnChild1 and burnChild2 stacks
+	// with CPU times within 1s of the expected values (2s and 4s respectively).
+	const ns = 1_000_000_000 // 1 second in nanoseconds
+	var child1Total, child2Total int64
+	var lastCollapsed string
+	var lastErr error
+	ok := assert.Eventually(t, func() bool {
+		collapsed, queryErr := querySpanPyroscopeProfile(t, pyroscopeURL, ls, spanId)
+		lastErr = queryErr
+		lastCollapsed = collapsed
+		if queryErr != nil || collapsed == "" {
+			return false
+		}
+		child1Total = sumCpuForFunction(collapsed, "WorkController.burnChild1")
+		child2Total = sumCpuForFunction(collapsed, "WorkController.burnChild2")
+		t.Logf("child1 total: %d ns (%.2f s), child2 total: %d ns (%.2f s)",
+			child1Total, float64(child1Total)/1e9, child2Total, float64(child2Total)/1e9)
+		child1InRange := math.Abs(float64(child1Total)-float64(2*ns)) <= float64(ns)
+		child2InRange := math.Abs(float64(child2Total)-float64(4*ns)) <= float64(ns)
+		return child1InRange && child2InRange
+	}, 60*time.Second, 2*time.Second)
+	if !ok {
+		t.Logf("query error: %v", lastErr)
+		t.Logf("last collapsed profile:\n%s", lastCollapsed)
+		t.Logf("child1 (burnChild1) total: %d ns, child2 (burnChild2) total: %d ns", child1Total, child2Total)
+		t.Fatalf("child1 expected ~2s (got %.2fs), child2 expected ~4s (got %.2fs)",
+			float64(child1Total)/1e9, float64(child2Total)/1e9)
+	}
 }
