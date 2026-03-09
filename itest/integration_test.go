@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"path/filepath"
 	"regexp"
@@ -494,7 +495,9 @@ func TestOtelLibraryChildSpans(t *testing.T) {
 
 	ls := labelSelector(appName)
 
-	// Poll until the span profile contains both burnChild1 and burnChild2 stacks.
+	// Poll until the span profile contains burnChild1 and burnChild2 stacks
+	// with CPU times within 1s of the expected values (2s and 4s respectively).
+	const ns = 1_000_000_000 // 1 second in nanoseconds
 	var child1Total, child2Total int64
 	var lastCollapsed string
 	var lastErr error
@@ -507,21 +510,17 @@ func TestOtelLibraryChildSpans(t *testing.T) {
 		}
 		child1Total = sumCpuForFunction(collapsed, "WorkController.burnChild1")
 		child2Total = sumCpuForFunction(collapsed, "WorkController.burnChild2")
-		return child1Total > 0 && child2Total > 0
+		t.Logf("child1 total: %d ns (%.2f s), child2 total: %d ns (%.2f s)",
+			child1Total, float64(child1Total)/1e9, child2Total, float64(child2Total)/1e9)
+		child1InRange := math.Abs(float64(child1Total)-float64(2*ns)) <= float64(ns)
+		child2InRange := math.Abs(float64(child2Total)-float64(4*ns)) <= float64(ns)
+		return child1InRange && child2InRange
 	}, 60*time.Second, 2*time.Second)
 	if !ok {
 		t.Logf("query error: %v", lastErr)
 		t.Logf("last collapsed profile:\n%s", lastCollapsed)
 		t.Logf("child1 (burnChild1) total: %d ns, child2 (burnChild2) total: %d ns", child1Total, child2Total)
-		t.FailNow()
+		t.Fatalf("child1 expected ~2s (got %.2fs), child2 expected ~4s (got %.2fs)",
+			float64(child1Total)/1e9, float64(child2Total)/1e9)
 	}
-
-	t.Logf("child1 total: %d ns (%.2f s)", child1Total, float64(child1Total)/1e9)
-	t.Logf("child2 total: %d ns (%.2f s)", child2Total, float64(child2Total)/1e9)
-
-	// child1 burns CPU for ~1s, child2 for ~2s.
-	// Assert each is within 10% of the expected value.
-	const ns = 1_000_000_000 // 1 second in nanoseconds
-	assert.InDelta(t, int64(1*ns), child1Total, float64(ns/10), "child1 should be ~1s of CPU")
-	assert.InDelta(t, int64(2*ns), child2Total, float64(2*ns/10), "child2 should be ~2s of CPU")
 }

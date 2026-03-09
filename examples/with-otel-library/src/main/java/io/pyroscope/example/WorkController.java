@@ -63,11 +63,11 @@ public class WorkController {
     }
 
     private void burnChild1() {
-        cpuBurner.burnFor(1_000);
+        cpuBurner.burnFor(2_000);
     }
 
     private void burnChild2() {
-        cpuBurner.burnFor(2_000);
+        cpuBurner.burnFor(4_000);
     }
 
     @GetMapping("/health")
