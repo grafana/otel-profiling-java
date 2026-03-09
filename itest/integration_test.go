@@ -520,16 +520,8 @@ func TestOtelLibraryChildSpans(t *testing.T) {
 	t.Logf("child2 total: %d ns (%.2f s)", child2Total, float64(child2Total)/1e9)
 
 	// child1 burns CPU for ~1s, child2 for ~2s.
-	// Assert each is in a reasonable range (profiling has sampling jitter).
+	// Assert each is within 10% of the expected value.
 	const ns = 1_000_000_000 // 1 second in nanoseconds
-	assert.Greater(t, child1Total, int64(ns/2), "child1 should have at least 0.5s of CPU")
-	assert.Less(t, child1Total, int64(ns*3), "child1 should have less than 3s of CPU")
-	assert.Greater(t, child2Total, int64(ns), "child2 should have at least 1s of CPU")
-	assert.Less(t, child2Total, int64(ns*5), "child2 should have less than 5s of CPU")
-
-	// child2 should be roughly 2x child1.
-	ratio := float64(child2Total) / float64(child1Total)
-	t.Logf("child2/child1 ratio: %.2f", ratio)
-	assert.Greater(t, ratio, 1.3, "child2 should be at least 1.3x child1")
-	assert.Less(t, ratio, 3.0, "child2 should be less than 3x child1")
+	assert.InDelta(t, int64(1*ns), child1Total, float64(ns/10), "child1 should be ~1s of CPU")
+	assert.InDelta(t, int64(2*ns), child2Total, float64(2*ns/10), "child2 should be ~2s of CPU")
 }
