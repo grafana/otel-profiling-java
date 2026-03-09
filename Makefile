@@ -1,5 +1,6 @@
 .PHONY: clean build build-otel-extension build-lib publish test \
-	itest itest-otel-extension itest-otel-library itest-otel-extension-manual-start
+	itest itest-otel-extension itest-otel-library itest-otel-extension-manual-start \
+	itest-otel-extension-zulu
 
 clean:
 	./gradlew clean
@@ -33,6 +34,9 @@ itest-otel-library: build
 
 itest-otel-extension-manual-start: build
 	cd itest && go test -v -timeout 20m -count=1 -run '^TestOtelExtensionManualStart$$' ./...
+
+itest-otel-extension-zulu: build
+	cd itest && go test -v -timeout 20m -count=1 -run '^TestOtelExtensionZulu$$' ./...
 
 itest: build
 	cd itest && go test -v -timeout 20m -count=1 -run '^TestOtelExtension$$' ./...
