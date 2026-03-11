@@ -31,7 +31,14 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                ProfilerApiHolder.INSTANCE.get().startProfiling();
+                ProfilerApi profiler = ProfilerApiHolder.INSTANCE.get();
+                if (profiler.isProfilingStarted()) {
+                    System.err.println("[pyroscope-otel] WARNING: Profiling is already started. " +
+                            "Running both pyroscope-java as -javaagent and the OTel extension is not recommended. " +
+                            "Use the OTel extension alone instead of combining it with -javaagent.");
+                } else {
+                    profiler.startProfiling();
+                }
             }
 
             PyroscopeOtelConfiguration pyroOtelConfig = new PyroscopeOtelConfiguration.Builder()
