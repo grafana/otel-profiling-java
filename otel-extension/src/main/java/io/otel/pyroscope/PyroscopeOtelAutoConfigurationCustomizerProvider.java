@@ -4,8 +4,10 @@ package io.otel.pyroscope;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.pyroscope.javaagent.ProfilerSdkFactory;
+import io.pyroscope.javaagent.api.Logger;
 import io.pyroscope.javaagent.api.ProfilerApi;
 import io.pyroscope.javaagent.api.ProfilerApiHolder;
+import io.pyroscope.javaagent.impl.DefaultLogger;
 
 import java.lang.reflect.Constructor;
 
@@ -33,7 +35,8 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
             if (startProfiling) {
                 ProfilerApi profiler = ProfilerApiHolder.INSTANCE.get();
                 if (profiler.isProfilingStarted()) {
-                    System.err.println("[pyroscope-otel] WARNING: Profiling is already started. " +
+                    DefaultLogger.PRECONFIG_LOGGER.log(Logger.Level.WARN,
+                            "Profiling is already started. " +
                             "Running both pyroscope-java as -javaagent and the OTel extension is not recommended. " +
                             "Use the OTel extension alone instead of combining it with -javaagent.");
                 } else {
