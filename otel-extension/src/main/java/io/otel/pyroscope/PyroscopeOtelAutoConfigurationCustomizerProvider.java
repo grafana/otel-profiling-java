@@ -26,17 +26,7 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
         BootstrapApiInjector.ensureInjected();
 
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
-            // Seed the holder with the embedded (relocated) ProfilerSdk as a safe fallback.
-            // This must happen before tryLoadFromSystemClassLoader() and startProfiling()
-            // because PyroscopeOtelSpanProcessor (whose static initializer also seeds) may
-            // not be loaded yet at this point.
             ProfilerApiHolder.INSTANCE.compareAndSet(null, ProfilerSdkFactory.create());
-
-            // Try to load ProfilerSdk from system classloader.
-            // This handles the case where pyroscope-java is on the system classpath
-            // (e.g., loaded as a -javaagent). The cast works because ProfilerApi
-            // is injected into the bootstrap classloader by the instrumentation module,
-            // and ProfilerSdk (from system classloader) implements the same interface.
             tryLoadFromSystemClassLoader();
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
