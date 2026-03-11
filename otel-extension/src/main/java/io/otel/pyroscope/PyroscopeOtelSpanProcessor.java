@@ -56,6 +56,9 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
     @Override
     public void onEnd(ReadableSpan span) {
+        if (configuration.rootSpanOnly && !isRootSpan(span)) {
+            return;
+        }
         getProfiler().setTracingContext(0, 0);
     }
 

@@ -1,15 +1,12 @@
 FROM gradle:8.14.3-jdk17 AS lib-builder
 WORKDIR /build
-COPY gradle/ ./gradle/
-COPY gradlew ./gradlew
-COPY gradlew.bat ./gradlew.bat
 COPY gradle.properties ./gradle.properties
 COPY settings.gradle ./settings.gradle
 COPY build.gradle ./build.gradle
 COPY lib/build.gradle ./lib/build.gradle
-RUN ./gradlew :lib:dependencies --no-daemon -q
+RUN gradle :lib:dependencies --no-daemon -q
 COPY lib/src/ ./lib/src/
-RUN ./gradlew :lib:jar --no-daemon -q
+RUN gradle :lib:jar --no-daemon -q
 
 FROM gradle:8.14.3-jdk17 AS builder
 WORKDIR /build

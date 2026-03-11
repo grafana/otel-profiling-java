@@ -1,15 +1,12 @@
 FROM gradle:8.14.3-jdk17 AS extension-builder
 WORKDIR /build
-COPY gradle/ ./gradle/
-COPY gradlew ./gradlew
-COPY gradlew.bat ./gradlew.bat
 COPY gradle.properties ./gradle.properties
 COPY settings.gradle ./settings.gradle
 COPY build.gradle ./build.gradle
 COPY otel-extension/build.gradle ./otel-extension/build.gradle
-RUN ./gradlew :otel-extension:dependencies --no-daemon -q
+RUN gradle :otel-extension:dependencies --no-daemon -q
 COPY otel-extension/src/ ./otel-extension/src/
-RUN ./gradlew :otel-extension:shadowJar --no-daemon -q
+RUN gradle :otel-extension:shadowJar --no-daemon -q
 
 FROM gradle:8.14.3-jdk17 AS builder
 WORKDIR /build
