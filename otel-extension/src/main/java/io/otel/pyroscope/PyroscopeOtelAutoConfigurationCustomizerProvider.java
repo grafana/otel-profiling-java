@@ -3,13 +3,13 @@ package io.otel.pyroscope;
 
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
-import io.pyroscope.javaagent.PyroscopeAgent;
-import io.pyroscope.javaagent.config.Config;
+import io.pyroscope.javaagent.ProfilerSdkFactory;
+import io.pyroscope.javaagent.api.Logger;
+import io.pyroscope.javaagent.api.ProfilerApi;
+import io.pyroscope.javaagent.api.ProfilerApiHolder;
+import io.pyroscope.javaagent.impl.DefaultLogger;
 
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.Base64;
+import java.lang.reflect.Constructor;
 
 import static io.otel.pyroscope.OtelCompat.getBoolean;
 
@@ -20,32 +20,27 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
 
     @Override
     public void customize(AutoConfigurationCustomizer autoConfiguration) {
+        BootstrapApiInjector.ensureInjected();
+
         autoConfiguration.addTracerProviderCustomizer((tpBuilder, cfg) -> {
-            OtelProfilerSdkBridge profilerSdk = null;
-            try {
-                profilerSdk = loadProfilerSdk();
-            } catch (Exception e) {
-                // This usually means we are running without the Pyroscope SDK.
-                // We'll instead use the Profiler bundled with the extension.
-                System.out.println("Could not load the profiler SDK, will continue with the built-in one!");
-                System.out.println("  Reason: " + e.getMessage());
-                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-                if (systemClassLoader instanceof URLClassLoader) {
-                    System.out.println("  JARs visible to system classloader:");
-                    for (URL url : ((URLClassLoader) systemClassLoader).getURLs()) {
-                        System.out.println("    " + url);
-                    }
-                } else {
-                    System.out.println("  System classloader is not a URLClassLoader (" + systemClassLoader.getClass().getName() + "), cannot list JARs");
+            if (ProfilerApiHolder.INSTANCE.get() == null) {
+                ProfilerApi api = tryLoadFromSystemClassLoader();
+                if (api == null) {
+                    api = ProfilerSdkFactory.create();
                 }
+                ProfilerApiHolder.INSTANCE.set(api);
             }
 
             boolean startProfiling = getBoolean(cfg, "otel.pyroscope.start.profiling", true);
             if (startProfiling) {
-                if (profilerSdk == null) {
-                    PyroscopeAgent.start(Config.build());
-                } else if (!profilerSdk.isProfilingStarted()) {
-                    profilerSdk.startProfiling();
+                ProfilerApi profiler = ProfilerApiHolder.INSTANCE.get();
+                if (profiler.isProfilingStarted()) {
+                    DefaultLogger.PRECONFIG_LOGGER.log(Logger.Level.WARN,
+                            "Profiling is already started. " +
+                            "Running both pyroscope-java as -javaagent and the OTel extension is not recommended. " +
+                            "Use the OTel extension alone instead of combining it with -javaagent.");
+                } else {
+                    profiler.startProfiling();
                 }
             }
 
@@ -55,37 +50,25 @@ public class PyroscopeOtelAutoConfigurationCustomizerProvider
                     .build();
 
             return tpBuilder.addSpanProcessor(
-                    new PyroscopeOtelSpanProcessor(
-                            pyroOtelConfig,
-                            profilerSdk
-                    ));
+                    new PyroscopeOtelSpanProcessor(pyroOtelConfig));
         });
     }
 
-    /**
-     * Open Telemetry extension classes are loaded by an isolated class loader.
-     * As such, they can't communicate with other parts of the application (e.g., the Pyroscope SDK).
-     * <p>
-     * If the Pyroscope SDK is loaded as a java agent, we'll access it via the system class loader and interact with it
-     * via a bridge.
-     */
-    private static OtelProfilerSdkBridge loadProfilerSdk() {
+    private static ProfilerApi tryLoadFromSystemClassLoader() {
         try {
-            ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-            Class<?> sdkClass = systemClassLoader.loadClass("io.pyroscope.javaagent.ProfilerSdk");
-            Object sdk = sdkClass.getDeclaredConstructor().newInstance();
-
-            Class<?> labelsWrapperClass = systemClassLoader.loadClass(getLabelsWrapperClassName());
-            Method registerConstant = labelsWrapperClass.getDeclaredMethod("registerConstant", String.class);
-
-            return new OtelProfilerSdkBridge(sdk, registerConstant);
+            ClassLoader systemCL = ClassLoader.getSystemClassLoader();
+            PyroscopeOtelDebug.log("AutoConfig: Trying to load ProfilerSdk from system classloader: " + systemCL);
+            String className = String.join(".", "io", "pyroscope", "javaagent", "ProfilerSdk");
+            Class<?> sdkClass = systemCL.loadClass(className);
+            PyroscopeOtelDebug.log("AutoConfig: Loaded ProfilerSdk, classloader: " + sdkClass.getClassLoader());
+            Constructor<?> ctor = sdkClass.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            ProfilerApi api = (ProfilerApi) ctor.newInstance();
+            PyroscopeOtelDebug.log("AutoConfig: Using system-classloader ProfilerSdk");
+            return api;
         } catch (Exception e) {
-            throw new RuntimeException("Error loading the profiler SDK", e);
+            PyroscopeOtelDebug.log("AutoConfig: Could not load from system classloader: " + e.getMessage());
+            return null;
         }
-    }
-
-    private static String getLabelsWrapperClassName() {
-        // otherwise the relocate plugin renames this string :shrug:
-        return new String(Base64.getDecoder().decode("aW8ucHlyb3Njb3BlLmxhYmVscy52Mi5QeXJvc2NvcGUkTGFiZWxzV3JhcHBlcg=="));
     }
 }
