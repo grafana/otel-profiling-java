@@ -1,4 +1,4 @@
-FROM gradle:8.14.3-jdk17 AS lib-builder
+FROM gradle:8.14.4-jdk17@sha256:1ad0ceec1f44ceeeafbdb67fbe68e974e3ebbcb73b2a8622d64e869172a03c81 AS lib-builder
 WORKDIR /build
 COPY gradle.properties ./gradle.properties
 COPY settings.gradle ./settings.gradle
@@ -8,7 +8,7 @@ RUN gradle :lib:dependencies --no-daemon -q
 COPY lib/src/ ./lib/src/
 RUN gradle :lib:jar --no-daemon -q
 
-FROM gradle:8.14.3-jdk17 AS builder
+FROM gradle:8.14.4-jdk17@sha256:1ad0ceec1f44ceeeafbdb67fbe68e974e3ebbcb73b2a8622d64e869172a03c81 AS builder
 WORKDIR /build
 COPY examples/with-otel-library/build.gradle ./build.gradle
 COPY examples/with-otel-library/settings.gradle ./settings.gradle
