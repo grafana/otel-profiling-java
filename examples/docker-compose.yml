@@ -1,11 +1,11 @@
 services:
   pyroscope:
-    image: grafana/pyroscope:latest
+    image: grafana/pyroscope:latest@sha256:6e8084763afe8e362ff16342b5c019dfa00c6ca6e85ba2dce81af38b4c6afbb2
     ports:
       - "4040:4040"
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:latest@sha256:e932bd6ed0e026595b08483cd0141e5103e1ab7ff8604839ff899b8dc54cabcb
     ports:
       - "3000:3000"
     environment:
