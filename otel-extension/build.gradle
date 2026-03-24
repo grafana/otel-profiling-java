@@ -41,6 +41,8 @@ java {
     withSourcesJar()
 }
 
+assemble.dependsOn shadowJar
+
 shadowJar {
     archiveFileName = "pyroscope-otel-javaagent-extension.jar"
     relocate("io.pyroscope", "io.otel.pyroscope.shadow") {
