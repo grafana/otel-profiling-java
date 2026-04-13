@@ -22,8 +22,8 @@ dependencies {
     implementation "io.pyroscope:agent:${property('pyroscope_version')}"
 
     // OpenTelemetry SDK for manual tracer/span creation
-    implementation "io.opentelemetry:opentelemetry-sdk:1.44.1"
-    implementation "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.44.1"
+    implementation "io.opentelemetry:opentelemetry-sdk:1.61.0"
+    implementation "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.61.0"
 
     // TODO: Once pyroscope-otel (this project) is published to Maven Central, replace this with:
     //       implementation 'io.pyroscope:otel:1.1.0'
