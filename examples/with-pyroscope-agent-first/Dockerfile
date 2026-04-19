@@ -18,7 +18,7 @@ RUN gradle dependencies --no-daemon -q
 COPY examples/with-otel-extension/src ./src
 RUN gradle bootJar --no-daemon -q
 
-FROM eclipse-temurin:17-jre@sha256:ff10c54cd455c944bd10528393462c02e487dfdef00b779777d59c6cf31d91cf
+FROM eclipse-temurin:17.0.18_8-jre@sha256:07c1f0f0c3f3c714cea7a9250a8418ec329baa2cea1f77dcda2a7332ff937633
 WORKDIR /app
 COPY --from=builder /build/build/libs/app.jar app.jar
 ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.15.0/opentelemetry-javaagent.jar opentelemetry-javaagent.jar
