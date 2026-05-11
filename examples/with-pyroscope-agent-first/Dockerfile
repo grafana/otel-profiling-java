@@ -1,4 +1,4 @@
-FROM gradle:8.14.4-jdk17@sha256:634d4b7fdb3c635091c122d94989066c17d8ec43ead10400638f47529d44f395 AS extension-builder
+FROM gradle:8.14.5-jdk17@sha256:8a814e7f3e2d8a368b24c9971a3d6054d689a0f4cbf998a03af31cb50fd5753e AS extension-builder
 WORKDIR /build
 COPY gradle.properties ./gradle.properties
 COPY settings.gradle ./settings.gradle
@@ -10,7 +10,7 @@ RUN gradle :otel-extension:shadowJar --no-daemon -q
 RUN PYROSCOPE_VERSION=$(grep pyroscope_version gradle.properties | cut -d= -f2) && \
     wget -q -O pyroscope-agent.jar "https://repo1.maven.org/maven2/io/pyroscope/agent/${PYROSCOPE_VERSION}/agent-${PYROSCOPE_VERSION}.jar"
 
-FROM gradle:8.14.4-jdk17@sha256:634d4b7fdb3c635091c122d94989066c17d8ec43ead10400638f47529d44f395 AS builder
+FROM gradle:8.14.5-jdk17@sha256:8a814e7f3e2d8a368b24c9971a3d6054d689a0f4cbf998a03af31cb50fd5753e AS builder
 WORKDIR /build
 COPY examples/with-otel-extension/build.gradle ./build.gradle
 COPY examples/with-otel-extension/settings.gradle ./settings.gradle
