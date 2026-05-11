@@ -21,8 +21,9 @@ subprojects {
 
     ext {
         versions = [
-                opentelemetry              : "1.62.0",
-                opentelemetryJavaagentAlpha: "1.33.6-alpha",
+                opentelemetry                   : "1.62.0",
+                opentelemetryInstrumentation    : "1.33.6",
+                opentelemetryJavaagentAlpha     : "1.33.6-alpha",
         ]
         pyroscopeVersion = rootProject.properties['pyroscope_version']
     }
