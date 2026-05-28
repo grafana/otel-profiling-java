@@ -40,6 +40,7 @@ func startPyroscope(t *testing.T, ctx context.Context, net *testcontainers.Docke
 	req := testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "grafana/pyroscope:latest",
+			Cmd:          []string{"-segment-writer.min-ready-duration=0s"},
 			ExposedPorts: []string{"4040/tcp"},
 			WaitingFor:   wait.ForHTTP("/ready").WithPort("4040/tcp").WithStartupTimeout(60 * time.Second),
 		},
