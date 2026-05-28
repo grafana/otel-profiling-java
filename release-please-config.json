@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "1a30c9bdd3924f40256cc868a17824354cda603a",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "skip-changelog": true,
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "otel-profiling-java",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "gradle.properties"
+        }
+      ],
+      "changelog-sections": [
+        {"type": "feat", "section": "Features"},
+        {"type": "fix", "section": "Bug Fixes"},
+        {"type": "perf", "section": "Performance Improvements"},
+        {"type": "chore", "section": "Miscellaneous Chores"},
+        {"type": "revert", "section": "Reverts"},
+        {"type": "docs", "section": "Documentation"},
+        {"type": "refactor", "section": "Code Refactoring"},
+        {"type": "build", "section": "Build System"},
+        {"type": "ci", "section": "Continuous Integration"}
+      ]
+    }
+  }
+}
