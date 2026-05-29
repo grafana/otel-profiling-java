@@ -66,9 +66,10 @@ jobs:
       - name: Prepare GPG Keyring
         id: prepare_gpg_keyring
         run: |
-          mkdir -p ${{ github.workspace }}/gpg
-          echo "$NEXUS_GPG_SECRING_FILE_BASE64" | base64 -d > ${{ github.workspace }}/gpg/secring.gpg
-          chmod 600 ${{ github.workspace }}/gpg/secring.gpg
+          mkdir -p "${{ github.workspace }}/gpg"
+          chmod 700 "${{ github.workspace }}/gpg"
+          echo "$NEXUS_GPG_SECRING_FILE_BASE64" | base64 -d > "${{ github.workspace }}/gpg/secring.gpg"
+          chmod 600 "${{ github.workspace }}/gpg/secring.gpg"
           echo "keyring_path=${{ github.workspace }}/gpg/secring.gpg" >> $GITHUB_OUTPUT
 
       - name: Build and Publish
@@ -91,3 +92,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: gh release edit "$TAG_NAME" --draft=false
+
+      - name: Remove GPG Keyring
+        if: always()
+        run: rm -rf "${{ github.workspace }}/gpg"
