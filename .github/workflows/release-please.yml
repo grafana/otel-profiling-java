@@ -19,6 +19,7 @@ jobs:
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
+      sha: ${{ steps.rp.outputs.sha }}
       version: ${{ steps.rp.outputs.version }}
     steps:
       - id: get-github-app-token
@@ -55,7 +56,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ needs.release-please.outputs.sha }}
           persist-credentials: false
 
       - name: Set up Java 8
@@ -86,3 +87,9 @@ jobs:
             otel-extension/build/libs/pyroscope-otel-javaagent-extension.jar \
             lib/build/libs/pyroscope-otel.jar \
             --clobber
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release edit "$TAG_NAME" --draft=false
