@@ -18,7 +18,7 @@ RUN gradle dependencies --no-daemon -q
 COPY examples/with-otel-library/src ./src
 RUN gradle bootJar --no-daemon -q
 
-FROM eclipse-temurin:17-jre@sha256:ff10c54cd455c944bd10528393462c02e487dfdef00b779777d59c6cf31d91cf
+FROM eclipse-temurin:17-jre@sha256:0d79988c68791ce864fe39d149ab1dc84f680539dca77ee7f6f3b041ad7f2f43
 WORKDIR /app
 COPY --from=builder /build/build/libs/app.jar app.jar
 EXPOSE 8080
