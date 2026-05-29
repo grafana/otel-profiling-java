@@ -13,8 +13,6 @@ jobs:
     name: Run release-please
     runs-on: ubuntu-x64
     permissions:
-      contents: write
-      pull-requests: write
       id-token: write
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
