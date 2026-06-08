@@ -63,6 +63,9 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
         asprof.setTracingContext(spanId, spanName);
+        String traceId = span.getSpanContext().getTraceId();
+        asprof.setTraceId(Long.parseUnsignedLong(traceId.substring(0, 16), 16),
+                          Long.parseUnsignedLong(traceId.substring(16, 32), 16));
     }
 
     @Override
@@ -71,6 +74,7 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
             return;
         }
         asprof.setTracingContext(0, 0);
+        asprof.setTraceId(0L, 0L);
     }
 
     public static long parseSpanId(String strProfileId) {
