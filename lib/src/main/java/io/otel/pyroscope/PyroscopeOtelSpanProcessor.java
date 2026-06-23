@@ -66,7 +66,11 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
         // W3C trace ID is 32 hex chars (128 bits). Parse directly into two longs
         // to avoid the String#substring allocations on this hot path.
         String traceId = span.getSpanContext().getTraceId();
-        asprof.setTraceId(parseHex64(traceId, 0), parseHex64(traceId, 16));
+        try {
+            asprof.setTraceId(parseHex64(traceId, 0), parseHex64(traceId, 16));
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            asprof.setTraceId(0, 0);
+        }
     }
 
     @Override

@@ -52,7 +52,11 @@ public final class PyroscopeOtelSpanProcessor implements SpanProcessor {
 
         span.setAttribute(ATTRIBUTE_KEY_PROFILE_ID, strProfileId);
         api.setTracingContext(spanId, spanName);
-        api.setTraceId(span.getSpanContext().getTraceId());
+        try {
+            api.setTraceId(span.getSpanContext().getTraceId());
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            api.clearTraceId();
+        }
     }
 
     @Override
