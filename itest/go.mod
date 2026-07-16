@@ -2,7 +2,7 @@ module otel-profiling-java-itest
 
 go 1.25.0
 
-toolchain go1.26.4
+toolchain go1.26.5
 
 require (
 	connectrpc.com/connect v1.19.1
