@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"slices"
@@ -8,8 +9,6 @@ import (
 	"strings"
 
 	"otel-profiling-java-itest/pyroscope/minheap"
-
-	dvarint "github.com/dennwc/varint"
 )
 
 type Tree struct {
@@ -300,7 +299,7 @@ func UnmarshalTree(b []byte) (*Tree, error) {
 
 	for len(parents) > 0 {
 		parent, parents = parents[len(parents)-1], parents[:len(parents)-1]
-		nameLen, o := dvarint.Uvarint(b[offset:])
+		nameLen, o := binary.Uvarint(b[offset:])
 		if o < 0 {
 			return nil, errMalformedTreeBytes
 		}
@@ -308,12 +307,12 @@ func UnmarshalTree(b []byte) (*Tree, error) {
 		// Note that we allocate a string, instead of referencing b's capacity.
 		name := string(b[offset : offset+int(nameLen)])
 		offset += int(nameLen)
-		value, o := dvarint.Uvarint(b[offset:])
+		value, o := binary.Uvarint(b[offset:])
 		if o < 0 {
 			return nil, errMalformedTreeBytes
 		}
 		offset += o
-		childrenLen, o := dvarint.Uvarint(b[offset:])
+		childrenLen, o := binary.Uvarint(b[offset:])
 		if o < 0 {
 			return nil, errMalformedTreeBytes
 		}
