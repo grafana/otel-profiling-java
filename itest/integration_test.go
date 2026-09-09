@@ -155,7 +155,7 @@ func querySpanTree(t *testing.T, pyroscopeURL string, labelSelector string, span
 	to := time.Now()
 	from := to.Add(-1 * time.Hour)
 	maxNodes := int64(65536)
-	resp, err := qc.SelectMergeSpanProfile(context.Background(), &querier.SelectMergeSpanProfileRequest{
+	resp, err := qc.SelectMergeStacktraces(context.Background(), &querier.SelectMergeStacktracesRequest{
 		ProfileTypeID: "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
 		Start:         from.UnixMilli(),
 		End:           to.UnixMilli(),
