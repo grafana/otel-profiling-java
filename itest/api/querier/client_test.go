@@ -9,11 +9,11 @@ import (
 	"testing"
 )
 
-func TestSelectMergeSpanProfile(t *testing.T) {
-	var received SelectMergeSpanProfileRequest
+func TestSelectMergeStacktraces(t *testing.T) {
+	var received SelectMergeStacktracesRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != selectMergeSpanProfilePath {
-			t.Errorf("path = %q, want %q", r.URL.Path, selectMergeSpanProfilePath)
+		if r.URL.Path != selectMergeStacktracesPath {
+			t.Errorf("path = %q, want %q", r.URL.Path, selectMergeStacktracesPath)
 		}
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("Content-Type = %q", r.Header.Get("Content-Type"))
@@ -21,12 +21,12 @@ func TestSelectMergeSpanProfile(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Errorf("decode request: %v", err)
 		}
-		_ = json.NewEncoder(w).Encode(SelectMergeSpanProfileResponse{Tree: []byte{1, 2, 3}})
+		_ = json.NewEncoder(w).Encode(SelectMergeStacktracesResponse{Tree: []byte{1, 2, 3}})
 	}))
 	t.Cleanup(server.Close)
 
 	maxNodes := int64(42)
-	request := &SelectMergeSpanProfileRequest{
+	request := &SelectMergeStacktracesRequest{
 		ProfileTypeID: "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
 		LabelSelector: `{service_name="example"}`,
 		SpanSelector:  []string{"0123456789abcdef"},
@@ -35,7 +35,7 @@ func TestSelectMergeSpanProfile(t *testing.T) {
 		MaxNodes:      &maxNodes,
 		Format:        ProfileFormatTree,
 	}
-	response, err := NewClient(server.Client(), server.URL+"/").SelectMergeSpanProfile(context.Background(), request)
+	response, err := NewClient(server.Client(), server.URL+"/").SelectMergeStacktraces(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
