@@ -43,12 +43,12 @@ jobs:
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version: 'stable'
-          cache-dependency-path: itest/go.sum
+          cache: false
 
       - name: List test functions
         id: list
         run: |
-          tests=$(cd itest && go test -list '^Test' ./... 2>/dev/null | grep '^Test' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          tests=$(cd itest && go test -list '^Test' . 2>/dev/null | grep '^Test' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "tests=$tests" >> "$GITHUB_OUTPUT"
 
   integration-test:
@@ -73,10 +73,10 @@ jobs:
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version: 'stable'
-          cache-dependency-path: itest/go.sum
+          cache: false
 
       - name: Build
         run: make build
 
       - name: Run ${{ matrix.test }}
-        run: cd itest && go test -v -timeout 20m -count=1 -run '^${{ matrix.test }}$$' ./...
+        run: cd itest && go test -v -timeout 20m -count=1 -run '^${{ matrix.test }}$$' .

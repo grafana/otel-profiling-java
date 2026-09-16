@@ -15,16 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"otel-profiling-java-itest/api/querier"
+	"otel-profiling-java-itest/dockertest"
 	"otel-profiling-java-itest/pyroscope/model"
-
-	"connectrpc.com/connect"
-	querierv1 "github.com/grafana/pyroscope/api/gen/proto/go/querier/v1"
-	"github.com/grafana/pyroscope/api/gen/proto/go/querier/v1/querierv1connect"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func repoRoot() string {
@@ -34,63 +27,44 @@ func repoRoot() string {
 	return filepath.Dir(filepath.Dir(filename))
 }
 
-func startPyroscope(t *testing.T, ctx context.Context, net *testcontainers.DockerNetwork) testcontainers.Container {
+func startPyroscope(t *testing.T, network *dockertest.Network) *dockertest.Container {
 	t.Helper()
 	t.Logf("starting pyroscope...")
-	req := testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "grafana/pyroscope:latest",
-			Cmd:          []string{"-segment-writer.min-ready-duration=0s"},
-			ExposedPorts: []string{"4040/tcp"},
-			WaitingFor:   wait.ForHTTP("/ready").WithPort("4040/tcp").WithStartupTimeout(60 * time.Second),
-		},
-		Started: true,
-	}
-	require.NoError(t, network.WithNetwork([]string{"pyroscope"}, net)(&req))
-	c, err := testcontainers.GenericContainer(ctx, req)
-	require.NoError(t, err, "failed to start pyroscope container")
-	return c
+	return dockertest.StartContainer(t, dockertest.ContainerRequest{
+		Image:          "grafana/pyroscope:latest",
+		Cmd:            []string{"-segment-writer.min-ready-duration=0s"},
+		ExposedPorts:   []string{"4040/tcp"},
+		Network:        network.Name,
+		NetworkAliases: []string{"pyroscope"},
+		WaitFor:        dockertest.WaitForHTTP("/ready", "4040/tcp", 60*time.Second),
+	})
 }
 
-func startApp(t *testing.T, ctx context.Context, root string, dockerfile string, net *testcontainers.DockerNetwork, env map[string]string) testcontainers.Container {
+func startApp(t *testing.T, root string, dockerfile string, network *dockertest.Network, env map[string]string) *dockertest.Container {
 	t.Helper()
 	t.Logf("starting example %s ...", dockerfile)
-
-	req := testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			FromDockerfile: testcontainers.FromDockerfile{
-				Context:    root,
-				Dockerfile: dockerfile,
-				KeepImage:  true,
-			},
-			ExposedPorts: []string{"8080/tcp"},
-			Env:          env,
-			WaitingFor:   wait.ForHTTP("/health").WithPort("8080/tcp").WithStartupTimeout(5 * time.Minute),
-		},
-		Started: true,
-	}
-	require.NoError(t, network.WithNetwork(nil, net)(&req))
-	c, err := testcontainers.GenericContainer(ctx, req)
-	require.NoError(t, err, "failed to start app container for %s", dockerfile)
-	return c
+	image := dockertest.BuildImage(t, dockertest.BuildRequest{
+		Context:    root,
+		Dockerfile: filepath.Join(root, dockerfile),
+		Tag:        fmt.Sprintf("otel-profiling-java-itest:%d", time.Now().UnixNano()),
+	})
+	return dockertest.StartContainer(t, dockertest.ContainerRequest{
+		Image:        image,
+		ExposedPorts: []string{"8080/tcp"},
+		Env:          env,
+		Network:      network.Name,
+		WaitFor:      dockertest.WaitForHTTP("/health", "8080/tcp", 5*time.Minute),
+	})
 }
 
-func getBaseURL(t *testing.T, ctx context.Context, c testcontainers.Container) string {
+func getBaseURL(t *testing.T, c *dockertest.Container) string {
 	t.Helper()
-	host, err := c.Host(ctx)
-	require.NoError(t, err)
-	mappedPort, err := c.MappedPort(ctx, "8080/tcp")
-	require.NoError(t, err)
-	return fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
+	return "http://" + c.HostPort(t, "8080/tcp")
 }
 
-func getPyroscopeURL(t *testing.T, ctx context.Context, c testcontainers.Container) string {
+func getPyroscopeURL(t *testing.T, c *dockertest.Container) string {
 	t.Helper()
-	host, err := c.Host(ctx)
-	require.NoError(t, err)
-	mappedPort, err := c.MappedPort(ctx, "4040/tcp")
-	require.NoError(t, err)
-	return fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
+	return "http://" + c.HostPort(t, "4040/tcp")
 }
 
 func requestFibonacci(t *testing.T, baseURL string) string {
@@ -134,15 +108,10 @@ func requestChildSpans(t *testing.T, baseURL string) string {
 	return res
 }
 
-func extractSpanIDFromLogs(ctx context.Context, c testcontainers.Container) (string, error) {
-	reader, err := c.Logs(ctx)
+func extractSpanIDFromLogs(c *dockertest.Container) (string, error) {
+	data, err := c.Logs()
 	if err != nil {
 		return "", fmt.Errorf("failed to get container logs: %w", err)
-	}
-	defer reader.Close()
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return "", fmt.Errorf("failed to read container logs: %w", err)
 	}
 	logs := string(data)
 
@@ -181,47 +150,37 @@ func querySpanPyroscopeProfile(t *testing.T, pyroscopeURL string, labelSelector 
 
 func querySpanTree(t *testing.T, pyroscopeURL string, labelSelector string, span string) (*model.Tree, error) {
 	t.Helper()
-	qc := querierv1connect.NewQuerierServiceClient(http.DefaultClient, pyroscopeURL)
+	qc := querier.NewClient(http.DefaultClient, pyroscopeURL)
 
 	to := time.Now()
 	from := to.Add(-1 * time.Hour)
 	maxNodes := int64(65536)
-	resp, err := qc.SelectMergeSpanProfile(context.Background(), connect.NewRequest(&querierv1.SelectMergeSpanProfileRequest{
+	resp, err := qc.SelectMergeSpanProfile(context.Background(), &querier.SelectMergeSpanProfileRequest{
 		ProfileTypeID: "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
 		Start:         from.UnixMilli(),
 		End:           to.UnixMilli(),
 		LabelSelector: labelSelector,
 		SpanSelector:  []string{span},
 		MaxNodes:      &maxNodes,
-		Format:        querierv1.ProfileFormat_PROFILE_FORMAT_TREE,
-	}))
+		Format:        querier.ProfileFormatTree,
+	})
 	t.Logf("querySpanTree %s %s %s = err %+v", pyroscopeURL, labelSelector, span, err)
 	if err != nil {
 		return nil, err
 	}
-	return model.UnmarshalTree(resp.Msg.Tree)
+	return model.UnmarshalTree(resp.Tree)
 }
 
 func TestOtelExtension(t *testing.T) {
 	const appName = "otel-extension-example"
-	ctx := context.Background()
 	root := repoRoot()
 
-	// Create network
-	net, err := network.New(ctx)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, net.Remove(ctx))
-	}()
-
-	pyroscopeC := startPyroscope(t, ctx, net)
-	defer func() {
-		require.NoError(t, pyroscopeC.Terminate(ctx))
-	}()
-	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	testNetwork := dockertest.CreateNetwork(t)
+	pyroscopeC := startPyroscope(t, testNetwork)
+	pyroscopeURL := getPyroscopeURL(t, pyroscopeC)
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
-	appC := startApp(t, ctx, root, "examples/with-otel-extension/Dockerfile", net, map[string]string{
+	appC := startApp(t, root, "examples/with-otel-extension/Dockerfile", testNetwork, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME": appName,
 		"PYROSCOPE_FORMAT":           "jfr",
@@ -230,11 +189,8 @@ func TestOtelExtension(t *testing.T) {
 		"OTEL_LOGS_EXPORTER":         "none",
 		"OTEL_METRICS_EXPORTER":      "none",
 	})
-	defer func() {
-		require.NoError(t, appC.Terminate(ctx))
-	}()
 
-	appURL := getBaseURL(t, ctx, appC)
+	appURL := getBaseURL(t, appC)
 	t.Logf("App URL: %s", appURL)
 
 	eventually(t, func() bool {
@@ -243,8 +199,9 @@ func TestOtelExtension(t *testing.T) {
 	})
 
 	var spanId string
+	var err error
 	eventually(t, func() bool {
-		spanId, err = extractSpanIDFromLogs(ctx, appC)
+		spanId, err = extractSpanIDFromLogs(appC)
 		return err == nil && spanId != ""
 	})
 
@@ -257,14 +214,44 @@ func TestOtelExtension(t *testing.T) {
 }
 
 func eventually(t *testing.T, condition func() bool) {
-	require.Eventually(t, condition, 30*time.Second, time.Second)
+	t.Helper()
+	if !waitFor(condition, 30*time.Second, time.Second) {
+		t.Fatal("condition was not satisfied before timeout")
+	}
+}
+
+func waitFor(condition func() bool, waitFor time.Duration, tick time.Duration) bool {
+	result := make(chan bool, 1)
+	check := func() { result <- condition() }
+
+	timer := time.NewTimer(waitFor)
+	defer timer.Stop()
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	go check()
+	var tickC <-chan time.Time
+	for {
+		select {
+		case <-timer.C:
+			return false
+		case <-tickC:
+			tickC = nil
+			go check()
+		case ok := <-result:
+			if ok {
+				return true
+			}
+			tickC = ticker.C
+		}
+	}
 }
 
 func eventuallyProfile(t *testing.T, pyroscopeURL string, appName string, spanId string, expectedStack string) {
 	t.Helper()
 	var lastCollapsed string
 	var lastErr error
-	ok := assert.Eventually(t, func() bool {
+	ok := waitFor(func() bool {
 		lastCollapsed, lastErr = querySpanPyroscopeProfile(t, pyroscopeURL,
 			labelSelector(appName), spanId)
 		return lastErr == nil && lastCollapsed != "" && strings.Contains(lastCollapsed, expectedStack)
@@ -278,34 +265,23 @@ func eventuallyProfile(t *testing.T, pyroscopeURL string, appName string, spanId
 
 func TestOtelLibrary(t *testing.T) {
 	const appName = "otel-library-example"
-	ctx := context.Background()
 	root := repoRoot()
 
-	net, err := network.New(ctx)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, net.Remove(ctx))
-	}()
-
-	pyroscopeC := startPyroscope(t, ctx, net)
-	defer func() {
-		require.NoError(t, pyroscopeC.Terminate(ctx))
-	}()
-	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	testNetwork := dockertest.CreateNetwork(t)
+	pyroscopeC := startPyroscope(t, testNetwork)
+	pyroscopeURL := getPyroscopeURL(t, pyroscopeC)
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
-	appC := startApp(t, ctx, root, "examples/with-otel-library/Dockerfile", net, map[string]string{
+	appC := startApp(t, root, "examples/with-otel-library/Dockerfile", testNetwork, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME": appName,
 	})
-	defer func() {
-		require.NoError(t, appC.Terminate(ctx))
-	}()
 
-	appURL := getBaseURL(t, ctx, appC)
+	appURL := getBaseURL(t, appC)
 	t.Logf("App URL: %s", appURL)
 
 	var spanId string
+	var err error
 	eventually(t, func() bool {
 		lastBody := requestFibonacci(t, appURL)
 		spanId, err = extractSpanIDFromBody(lastBody)
@@ -320,23 +296,14 @@ func TestOtelLibrary(t *testing.T) {
 
 func TestOtelExtensionManualStart(t *testing.T) {
 	const appName = "otel-extension-manual-start-example"
-	ctx := context.Background()
 	root := repoRoot()
 
-	net, err := network.New(ctx)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, net.Remove(ctx))
-	}()
-
-	pyroscopeC := startPyroscope(t, ctx, net)
-	defer func() {
-		require.NoError(t, pyroscopeC.Terminate(ctx))
-	}()
-	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	testNetwork := dockertest.CreateNetwork(t)
+	pyroscopeC := startPyroscope(t, testNetwork)
+	pyroscopeURL := getPyroscopeURL(t, pyroscopeC)
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
-	appC := startApp(t, ctx, root, "examples/with-otel-extension-manual-start/Dockerfile", net, map[string]string{
+	appC := startApp(t, root, "examples/with-otel-extension-manual-start/Dockerfile", testNetwork, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":       "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME":     appName,
 		"OTEL_SERVICE_NAME":              appName,
@@ -345,11 +312,8 @@ func TestOtelExtensionManualStart(t *testing.T) {
 		"OTEL_LOGS_EXPORTER":             "none",
 		"OTEL_METRICS_EXPORTER":          "none",
 	})
-	defer func() {
-		require.NoError(t, appC.Terminate(ctx))
-	}()
 
-	appURL := getBaseURL(t, ctx, appC)
+	appURL := getBaseURL(t, appC)
 	t.Logf("App URL: %s", appURL)
 
 	eventually(t, func() bool {
@@ -358,8 +322,9 @@ func TestOtelExtensionManualStart(t *testing.T) {
 	})
 
 	var spanId string
+	var err error
 	eventually(t, func() bool {
-		spanId, err = extractSpanIDFromLogs(ctx, appC)
+		spanId, err = extractSpanIDFromLogs(appC)
 		return err == nil && spanId != ""
 	})
 
@@ -376,23 +341,14 @@ func TestOtelExtensionManualStart(t *testing.T) {
 
 func TestPyroscopeAgentFirst(t *testing.T) {
 	const appName = "pyroscope-agent-first-test"
-	ctx := context.Background()
 	root := repoRoot()
 
-	net, err := network.New(ctx)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, net.Remove(ctx))
-	}()
-
-	pyroscopeC := startPyroscope(t, ctx, net)
-	defer func() {
-		require.NoError(t, pyroscopeC.Terminate(ctx))
-	}()
-	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	testNetwork := dockertest.CreateNetwork(t)
+	pyroscopeC := startPyroscope(t, testNetwork)
+	pyroscopeURL := getPyroscopeURL(t, pyroscopeC)
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
-	appC := startApp(t, ctx, root, "examples/with-pyroscope-agent-first/Dockerfile", net, map[string]string{
+	appC := startApp(t, root, "examples/with-pyroscope-agent-first/Dockerfile", testNetwork, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME": appName,
 		"PYROSCOPE_FORMAT":           "jfr",
@@ -401,11 +357,8 @@ func TestPyroscopeAgentFirst(t *testing.T) {
 		"OTEL_LOGS_EXPORTER":         "none",
 		"OTEL_METRICS_EXPORTER":      "none",
 	})
-	defer func() {
-		require.NoError(t, appC.Terminate(ctx))
-	}()
 
-	appURL := getBaseURL(t, ctx, appC)
+	appURL := getBaseURL(t, appC)
 	t.Logf("App URL: %s", appURL)
 
 	eventually(t, func() bool {
@@ -414,8 +367,9 @@ func TestPyroscopeAgentFirst(t *testing.T) {
 	})
 
 	var spanId string
+	var err error
 	eventually(t, func() bool {
-		spanId, err = extractSpanIDFromLogs(ctx, appC)
+		spanId, err = extractSpanIDFromLogs(appC)
 		return err == nil && spanId != ""
 	})
 
@@ -457,35 +411,24 @@ func sumCpuForFunction(collapsed string, funcName string) int64 {
 
 func TestOtelLibraryChildSpans(t *testing.T) {
 	const appName = "otel-library-child-spans-test"
-	ctx := context.Background()
 	root := repoRoot()
 
-	net, err := network.New(ctx)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, net.Remove(ctx))
-	}()
-
-	pyroscopeC := startPyroscope(t, ctx, net)
-	defer func() {
-		require.NoError(t, pyroscopeC.Terminate(ctx))
-	}()
-	pyroscopeURL := getPyroscopeURL(t, ctx, pyroscopeC)
+	testNetwork := dockertest.CreateNetwork(t)
+	pyroscopeC := startPyroscope(t, testNetwork)
+	pyroscopeURL := getPyroscopeURL(t, pyroscopeC)
 	t.Logf("Pyroscope URL: %s", pyroscopeURL)
 
-	appC := startApp(t, ctx, root, "examples/with-otel-library/Dockerfile", net, map[string]string{
+	appC := startApp(t, root, "examples/with-otel-library/Dockerfile", testNetwork, map[string]string{
 		"PYROSCOPE_SERVER_ADDRESS":   "http://pyroscope:4040",
 		"PYROSCOPE_APPLICATION_NAME": appName,
 	})
-	defer func() {
-		require.NoError(t, appC.Terminate(ctx))
-	}()
 
-	appURL := getBaseURL(t, ctx, appC)
+	appURL := getBaseURL(t, appC)
 	t.Logf("App URL: %s", appURL)
 
 	// Hit the /child-spans endpoint and extract the span ID.
 	var spanId string
+	var err error
 	eventually(t, func() bool {
 		body := requestChildSpans(t, appURL)
 		spanId, err = extractSpanIDFromBody(body)
@@ -502,7 +445,7 @@ func TestOtelLibraryChildSpans(t *testing.T) {
 	var child1Total, child2Total int64
 	var lastCollapsed string
 	var lastErr error
-	ok := assert.Eventually(t, func() bool {
+	ok := waitFor(func() bool {
 		collapsed, queryErr := querySpanPyroscopeProfile(t, pyroscopeURL, ls, spanId)
 		lastErr = queryErr
 		lastCollapsed = collapsed
