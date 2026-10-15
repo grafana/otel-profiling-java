@@ -30,34 +30,8 @@ permissions:
   contents: read
 
 jobs:
-  discover-tests:
-    runs-on: ubuntu-x64-small
-    outputs:
-      tests: ${{ steps.list.outputs.tests }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
-        with:
-          go-version: 'stable'
-          cache: false
-
-      - name: List test functions
-        id: list
-        run: |
-          tests=$(cd itest && go test -list '^Test' . 2>/dev/null | grep '^Test' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "tests=$tests" >> "$GITHUB_OUTPUT"
-
   integration-test:
-    needs: discover-tests
     runs-on: ubuntu-x64-small
-    strategy:
-      fail-fast: false
-      matrix:
-        test: ${{ fromJson(needs.discover-tests.outputs.tests) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -78,5 +52,5 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Run ${{ matrix.test }}
-        run: cd itest && go test -v -timeout 20m -count=1 -run '^${{ matrix.test }}$$' .
+      - name: Run integration tests
+        run: cd itest && go test -v -timeout 30m -count=1 .
